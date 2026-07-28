@@ -1,0 +1,26 @@
+{
+  "name": "loreloom-backend",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Loreloom hackathon demo workspace",
+  "workspaces": [
+    "apps/*",
+    "contracts"
+  ],
+  "scripts": {
+    "dev": "concurrently -n api,web -c cyan,magenta \"npm run dev:api\" \"npm run dev:web\"",
+    "dev:all": "concurrently -n api,worker,web -c cyan,yellow,magenta \"npm run dev:api\" \"npm run dev:worker\" \"npm run dev:web\"",
+    "dev:api": "npm run dev -w @loreloom/api",
+    "dev:worker": "npm run dev:worker -w @loreloom/api",
+    "dev:web": "npm run dev -w @loreloom/web",
+    "build": "npm run build -w @loreloom/api -w @loreloom/web -w @loreloom/contracts --if-present",
+    "typecheck": "npm run typecheck -w @loreloom/api -w @loreloom/web -w @loreloom/contracts --if-present",
+    "test:contracts": "npm test -w @loreloom/contracts"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}

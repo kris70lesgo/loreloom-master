@@ -1,0 +1,14 @@
+{
+  "chainId": 1952,
+  "rpcUrl": "https://xlayertestrpc.okx.com",
+  "deployer": "0xF440F6363a3A99bFa2Ae8b856b965D716a1694a9",
+  "deployedAt": "2026-07-23T03:39:23.554Z",
+  "genesis": {
+    "address": "0xE4C2e906eabfC825193A7b8410274529889dc294",
+    "txHash": "0xe4d0e5520f27b511da1722fdb5224962aa82ccbe437a18429fa59d254bba0fb1"
+  },
+  "chapter": {
+    "address": "0x6A9c67B95C5669d63BaFa641d9B5aae4160Fce44",
+    "txHash": "0xd8f31836ec69fce175b5e37b257d2ae4523197e71b46c3230370f3a98b67860c"
+  }
+}

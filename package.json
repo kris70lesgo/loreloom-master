@@ -1,0 +1,28 @@
+{
+  "name": "loreloom-monorepo",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "frontend",
+    "backend",
+    "backend/apps/api",
+    "backend/apps/web",
+    "backend/contracts"
+  ],
+  "scripts": {
+    "dev:frontend": "npm run dev -w loreloom-frontend",
+    "dev:backend": "npm run dev -w @loreloom/api",
+    "dev:worker": "npm run dev:worker -w @loreloom/api",
+    "dev": "concurrently -n frontend,backend,worker -c green,magenta,yellow \"npm run dev:frontend\" \"npm run dev:backend\" \"npm run dev:worker\"",
+    "build:frontend": "npm run build -w loreloom-frontend",
+    "build:backend": "npm run build -w @loreloom/api",
+    "install:all": "npm install"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "dependencies": {
+    "lucide-react": "^1.27.0",
+    "playwright": "^1.62.0"
+  }
+}
