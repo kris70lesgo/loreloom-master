@@ -99,7 +99,7 @@ export default function ProducerDashboard() {
     setIsRunning(true);
 
     const eventSource = new EventSource(
-      `http://localhost:4000/api/production/stream?prompt=${encodeURIComponent(prompt)}&budget=${budget}&chaos=${chaosMode}&worldId=${encodeURIComponent(activeWorld.id)}`
+      `/api/production/stream?prompt=${encodeURIComponent(prompt)}&budget=${budget}&chaos=${chaosMode}&worldId=${encodeURIComponent(activeWorld.id)}`
     );
 
     eventSource.onmessage = (event) => {

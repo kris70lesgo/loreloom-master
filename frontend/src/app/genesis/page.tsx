@@ -215,7 +215,7 @@ export default function GenesisPage() {
     const targetLabel = selectedNodes.length > 0 ? selectedNodes.map(n => n.label).join(", ") : "General";
     setChatHistory(prev => [...prev, { role: "user", content: `Refine [${targetLabel}]: ${instruction}` }]);
     
-    const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+    const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
     try {
       const prompt = [
@@ -492,7 +492,7 @@ export default function GenesisPage() {
     const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();
     const activeUserId = user?.id || localStorage.getItem("loreloom_active_wallet") || "0xa33Ebc28fF3b0135ba2DaC18990DDDc162Dc2467";
-    const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+    const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
     try {
       const response = await fetch(`${API_URL}/api/worlds`, {
@@ -530,7 +530,7 @@ export default function GenesisPage() {
 
     let isMounted = true;
     let attempts = 0;
-    const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+    const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
     const poll = async () => {
       try {
@@ -591,7 +591,7 @@ export default function GenesisPage() {
     setIsCommitting(true);
     setError(null);
 
-    const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+    const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
     try {
       const response = await fetch(`${API_URL}/api/worlds/${createdWorldId}/confirm`, {

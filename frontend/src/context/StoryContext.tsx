@@ -60,7 +60,7 @@ interface StoryContextType {
 
 const StoryContext = createContext<StoryContextType | undefined>(undefined);
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 const WALLET_ADDRESS = process.env.NEXT_PUBLIC_WALLET_ADDRESS || "0xa33Ebc28fF3b0135ba2DaC18990DDDc162Dc2467";
 
 // Backend API response shapes for type-safe mapping
