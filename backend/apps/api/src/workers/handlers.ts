@@ -1,4 +1,5 @@
 import { getSupabaseAdmin } from "../db/supabase.js";
+import { config } from "../config.js";
 import { AiBlockedError } from "../ai/errors.js";
 import type { GenerationJobRow } from "../db/types.js";
 import { generateChapterImageUrl, generatePortraitUrl } from "../services/images.js";
@@ -230,7 +231,7 @@ async function processChapterImageJob(job: GenerationJobRow) {
     }
 
     await updateJobCheckpoint(job.id, {
-      image: { provider: "gemini", model: "configured", safety: { status: "passed" } }
+      image: { provider: "openrouter", model: "configured", safety: { status: "passed" } }
     });
   }
 
@@ -296,15 +297,17 @@ async function processChapterMintJob(job: GenerationJobRow) {
 function providerFromJob(job: GenerationJobRow) {
   if (typeof job.payload === "object" && job.payload !== null && !Array.isArray(job.payload)) {
     const provider = job.payload.provider;
-    // Skip openrouter — free tier has a strict daily rate limit causing 429 failures.
-    // Map any openrouter jobs to gemini so retrying DB jobs also work.
-    if (provider === "gemini" || provider === "nvidia") {
-      return provider;
+    if (provider === "openrouter" || provider === "nvidia") {
+      return provider as "openrouter" | "nvidia";
     }
   }
 
-  // Default to Gemini — reliable primary provider with generous quota.
-  return "gemini" as const;
+  // If NVIDIA is configured, prefer it over OpenRouter since OpenRouter free tier is heavily rate-limited (429)
+  if (config.nvidia.apiKey) {
+    return "nvidia" as const;
+  }
+
+  return "openrouter" as const;
 }
 
 function generationCheckpoint(

@@ -7,22 +7,22 @@ import type { ChapterRow, JsonValue, WorldRow } from "../db/types.js";
 import { fetchVisualKnowledge } from "./knowledge.js";
 
 const shortText = (max: number) => z.string().trim().min(1).max(max);
-const factsSchema = z.array(shortText(300)).max(12);
+const factsSchema = z.array(shortText(300)).max(6); // Reduced from 12 to 6
 
 const characterSheetSchema = z.object({
   name: shortText(80),
-  visualTraits: z.array(shortText(160)).min(3).max(8),
-  personality: z.array(shortText(120)).min(3).max(6),
-  styleKeywords: z.array(shortText(80)).min(3).max(8),
-  characterSummary: shortText(500),
-  growthArc: shortText(500),
-  backgroundsAndLayouts: shortText(500),
-  hardRules: shortText(500)
+  visualTraits: z.array(shortText(160)).min(2).max(5), // Reduced max limits
+  personality: z.array(shortText(120)).min(2).max(4),
+  styleKeywords: z.array(shortText(80)).min(2).max(5),
+  characterSummary: shortText(300), // Reduced from 500
+  growthArc: shortText(300), // Reduced from 500
+  backgroundsAndLayouts: shortText(300),
+  hardRules: shortText(300)
 });
 
 export const genesisOutputSchema = z.object({
   characterSheet: characterSheetSchema,
-  portraitPrompt: shortText(1_400),
+  portraitPrompt: shortText(800), // Reduced from 1400
   worldFacts: factsSchema,
   openThreads: factsSchema
 });
@@ -60,9 +60,9 @@ const genesisTool: ToolDefinition = {
         ],
         properties: {
           name: { type: "string" },
-          visualTraits: { type: "array", items: { type: "string" }, minItems: 3, maxItems: 8 },
-          personality: { type: "array", items: { type: "string" }, minItems: 3, maxItems: 6 },
-          styleKeywords: { type: "array", items: { type: "string" }, minItems: 3, maxItems: 8 },
+          visualTraits: { type: "array", items: { type: "string" }, minItems: 2, maxItems: 5 },
+          personality: { type: "array", items: { type: "string" }, minItems: 2, maxItems: 4 },
+          styleKeywords: { type: "array", items: { type: "string" }, minItems: 2, maxItems: 5 },
           characterSummary: { type: "string" },
           growthArc: { type: "string" },
           backgroundsAndLayouts: { type: "string" },
@@ -70,8 +70,8 @@ const genesisTool: ToolDefinition = {
         }
       },
       portraitPrompt: { type: "string" },
-      worldFacts: { type: "array", items: { type: "string" }, maxItems: 12 },
-      openThreads: { type: "array", items: { type: "string" }, maxItems: 12 }
+      worldFacts: { type: "array", items: { type: "string" }, maxItems: 6 },
+      openThreads: { type: "array", items: { type: "string" }, maxItems: 6 }
     }
   }
 };
@@ -120,7 +120,7 @@ export async function generateGenesisDraft(input: {
   ].join("\n");
 
   return generateValidated({
-    provider: input.provider ?? "gemini",
+    provider: input.provider ?? "openrouter",
     tool: genesisTool,
     schema: genesisOutputSchema,
     systemPrompt:
@@ -146,7 +146,7 @@ export async function generateChapterDraft(
   ].join("\n");
 
   return generateValidated({
-    provider: provider ?? "gemini",
+    provider: provider ?? "openrouter",
     tool: chapterTool,
     schema: chapterOutputSchema,
     systemPrompt:
@@ -173,7 +173,7 @@ async function generateValidated<T>(input: {
       systemPrompt: input.systemPrompt,
       prompt: `${input.prompt}${repairContext}`,
       temperature: input.temperature,
-      allowNvidiaFallback: input.provider === "gemini"
+
     });
 
     if (generation.safety.status !== "passed") {

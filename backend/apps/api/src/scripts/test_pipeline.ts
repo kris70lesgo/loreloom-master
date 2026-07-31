@@ -59,92 +59,6 @@ async function testNvidiaImage(): Promise<string | null> {
   }
 }
 
-async function testHuggingFaceImage(): Promise<string | null> {
-  if (!config.huggingface.apiKey) {
-    console.warn("Hugging Face API key not configured. Skipping.");
-    return null;
-  }
-
-  console.log("Calling Hugging Face FLUX.1-schnell...");
-  const hfController = new AbortController();
-  const hfTimeout = setTimeout(() => hfController.abort(), 30_000);
-  try {
-    const response = await fetch(
-      `https://api-inference.huggingface.co/models/${config.huggingface.imageModel}`,
-      {
-        signal: hfController.signal,
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${config.huggingface.apiKey}`,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ inputs: PROMPT })
-      }
-    );
-    clearTimeout(hfTimeout);
-
-    const mimeType = response.headers.get("content-type")?.split(";")[0] ?? "";
-    if (!response.ok || !mimeType.startsWith("image/")) {
-      const err = (await response.json().catch(() => ({}))) as { error?: string };
-      console.warn("Hugging Face failed:", err.error ?? response.statusText);
-      return null;
-    }
-
-    const bytes = Buffer.from(await response.arrayBuffer());
-    return bytes.toString("base64");
-  } finally {
-    clearTimeout(hfTimeout);
-  }
-}
-
-async function testGeminiImage(): Promise<string | null> {
-  if (!config.gemini.apiKey) {
-    console.warn("Gemini API key not configured. Skipping.");
-    return null;
-  }
-
-  console.log("Calling Gemini (text-to-image)...");
-  const model = config.gemini.imageModel;
-  const geminiUrl = new URL(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`);
-  geminiUrl.searchParams.set("key", config.gemini.apiKey);
-
-  const gmController = new AbortController();
-  const gmTimeout = setTimeout(() => gmController.abort(), 30_000);
-  try {
-    const response = await fetch(geminiUrl, {
-      signal: gmController.signal,
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ role: "user", parts: [{ text: PROMPT }] }],
-        generationConfig: { responseModalities: ["TEXT", "IMAGE"] }
-      })
-    });
-    clearTimeout(gmTimeout);
-
-    const data = (await response.json().catch(() => ({}))) as {
-      error?: { message?: string };
-      candidates?: Array<{
-        content?: { parts?: Array<{ inlineData?: { mimeType?: string; data?: string } }> };
-      }>;
-    };
-
-    if (!response.ok) {
-      console.warn("Gemini failed:", data.error?.message ?? response.statusText);
-      return null;
-    }
-
-    const image = data.candidates?.[0]?.content?.parts?.find((p) => p.inlineData?.data)?.inlineData;
-    if (!image?.data) {
-      console.warn("Gemini did not return image data.");
-      return null;
-    }
-
-    return image.data;
-  } finally {
-    clearTimeout(gmTimeout);
-  }
-}
 
 async function main() {
   console.log("═══ Loreloom Image Pipeline Test ═══");
@@ -155,8 +69,6 @@ async function main() {
 
   const attempts: Array<[string, () => Promise<string | null>]> = [
     ["NVIDIA FLUX.1-schnell", testNvidiaImage],
-    ["Hugging Face FLUX.1-schnell", testHuggingFaceImage],
-    ["Gemini (text-to-image)", testGeminiImage],
   ];
 
   let savedPath: string | null = null;

@@ -6,21 +6,12 @@ import { fetchVisualKnowledge } from "./knowledge.js";
 
 type AspectRatio = "16:9" | "1:1" | "9:16";
 
-type GeminiImageResponse = {
-  promptFeedback?: { blockReason?: string; blockReasonMessage?: string };
-  candidates?: Array<{
-    finishReason?: string;
-    safetyRatings?: Array<{ blocked?: boolean; category?: string }>;
-    content?: { parts?: Array<{ inlineData?: { mimeType?: string; data?: string } }> };
-  }>;
-  error?: { message?: string };
-};
+
 
 export async function generatePortraitUrl(world: WorldRow) {
   const portraitPrompt = portraitPromptFromWorld(world);
-  const grounding = await fetchVisualKnowledge(world.title || world.style_lock || "");
   return generateImage({
-    prompt: `${portraitPrompt}\n${grounding ? `Visual grounding: ${grounding}\n` : ""}Create a single polished reference portrait. Preserve these locked style keywords: ${world.style_lock ?? "cinematic storybook"}.`,
+    prompt: `${portraitPrompt}\nCreate a single polished reference portrait. Preserve these locked style keywords: ${world.style_lock ?? "cinematic storybook"}.`,
     name: `loreloom-${world.id}-portrait.png`
   });
 }
@@ -76,59 +67,7 @@ function aspectToDimensions(aspectRatio: AspectRatio): { width: number; height: 
   }
 }
 
-async function generateGeminiImage(input: { prompt: string; referenceImageUrl?: string; name: string }, retryNoImage = false) {
-  if (!config.gemini.apiKey) {
-    throw new ProviderSetupError("Gemini", "GEMINI_API_KEY");
-  }
 
-  const model = config.gemini.imageModel;
-  const url = new URL(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`);
-  url.searchParams.set("key", config.gemini.apiKey);
-
-  const parts: Array<Record<string, unknown>> = [{ text: input.prompt }];
-  if (input.referenceImageUrl && !retryNoImage) {
-    const referencePart = await fetchReferenceImage(input.referenceImageUrl);
-    parts.push({ inlineData: referencePart });
-  }
-
-  const response = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      contents: [{ role: "user", parts }],
-      generationConfig: { responseModalities: ["TEXT", "IMAGE"] }
-    })
-  });
-  const data = (await response.json().catch(() => ({}))) as GeminiImageResponse;
-
-  if (!response.ok) {
-    const geminiMsg = data.error?.message ?? "";
-    if (geminiMsg.includes("does not support image input") || geminiMsg.includes("not supported")) {
-      if (input.referenceImageUrl && !retryNoImage) {
-        console.warn(`[images] Gemini model "${model}" does not support image input — retrying without reference image.`);
-        return generateGeminiImage({ ...input, referenceImageUrl: undefined }, true);
-      }
-      console.warn(`[images] Gemini model "${model}" does not support image input.`);
-    }
-    throw new ProviderRequestError("Gemini image", geminiMsg || response.statusText, response.status);
-  }
-
-  const candidate = data.candidates?.[0];
-  const blocked = data.promptFeedback?.blockReason || candidate?.finishReason === "SAFETY" || candidate?.safetyRatings?.find((item) => item.blocked);
-  if (blocked) {
-    throw new AiBlockedError("Gemini blocked this illustration.", {
-      reason: data.promptFeedback?.blockReasonMessage ?? data.promptFeedback?.blockReason,
-      finishReason: candidate?.finishReason
-    });
-  }
-
-  const image = candidate?.content?.parts?.find((part) => part.inlineData?.data)?.inlineData;
-  if (!image?.data || !image.mimeType) {
-    throw new AiBlockedError("Gemini did not return a usable illustration.", { finishReason: candidate?.finishReason });
-  }
-
-  return pinImage({ bytes: Buffer.from(image.data, "base64"), mimeType: image.mimeType, name: input.name });
-}
 
 async function generatePollinationsImage(input: { prompt: string; name: string; aspectRatio?: AspectRatio }) {
   const dims = aspectToDimensions(input.aspectRatio ?? "1:1");
@@ -149,17 +88,7 @@ async function generatePollinationsImage(input: { prompt: string; name: string; 
 async function generateImage(input: { prompt: string; referenceImageUrl?: string; name: string; aspectRatio?: AspectRatio }) {
   console.log(`[images] Constructing image generation for prompt: "${input.prompt.slice(0, 100)}..."`);
 
-  // 1. Try Gemini first (if configured and valid)
-  if (config.gemini.apiKey) {
-    try {
-      console.log("[images] Attempting image generation via Gemini API...");
-      const url = await generateGeminiImage(input);
-      console.log("[images] Gemini image generation succeeded:", url);
-      return url;
-    } catch (err) {
-      console.warn("[images] Gemini generation failed, falling back...", err);
-    }
-  }
+
 
   // 2. Try Stability AI next
   if (config.stability.apiKey) {
@@ -265,35 +194,7 @@ async function generateNvidiaImage(input: { prompt: string; name: string; aspect
   return pinImage({ bytes: Buffer.from(base64, "base64"), mimeType: "image/jpeg", name: input.name });
 }
 
-async function generateHuggingFaceImage(input: { prompt: string; name: string }) {
-  if (!config.huggingface.apiKey) {
-    throw new ProviderSetupError("Hugging Face", "HUGGINGFACE_API_KEY");
-  }
 
-  const response = await fetch(
-    `https://api-inference.huggingface.co/models/${config.huggingface.imageModel}`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${config.huggingface.apiKey}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({ inputs: input.prompt })
-    }
-  );
-
-  const mimeType = response.headers.get("content-type")?.split(";")[0] ?? "";
-  if (!response.ok || !mimeType.startsWith("image/")) {
-    const data = (await response.json().catch(() => ({}))) as { error?: string; message?: string };
-    throw new ProviderRequestError(
-      "Hugging Face image",
-      data.error ?? data.message ?? response.statusText,
-      response.status
-    );
-  }
-
-  return pinImage({ bytes: new Uint8Array(await response.arrayBuffer()), mimeType, name: input.name });
-}
 
 function placeholderImage(prompt: string) {
   const defaultPortraits = [
@@ -320,12 +221,32 @@ async function fetchReferenceImage(imageUrl: string) {
 }
 
 function portraitPromptFromWorld(world: WorldRow) {
-  if (typeof world.character_sheet === "object" && world.character_sheet !== null && !Array.isArray(world.character_sheet)) {
-    const prompt = (world.character_sheet as Record<string, unknown>).portraitPrompt;
-    if (typeof prompt === "string" && prompt.trim()) {
-      return prompt;
+  let cs: any = world.character_sheet;
+  if (typeof cs === "string" && cs.trim()) {
+    try {
+      cs = JSON.parse(cs);
+    } catch (e) {
+      cs = null;
     }
   }
 
-  throw new AiBlockedError("The Genesis agent did not produce a locked portrait prompt.");
+  if (typeof cs === "object" && cs !== null && !Array.isArray(cs)) {
+    const prompt = cs.portraitPrompt;
+    if (typeof prompt === "string" && prompt.trim()) {
+      return prompt;
+    }
+    
+    // Robust fallback if portraitPrompt is missing
+    const name = typeof cs.name === "string" ? cs.name : "the protagonist";
+    const desc = typeof cs.appearance === "string" 
+      ? cs.appearance 
+      : (typeof cs.characterSummary === "string" ? cs.characterSummary : "mysterious hero");
+    const style = world.style_lock ? `In the style of ${world.style_lock}` : "";
+    return `A high-quality cinematic reference portrait of ${name}, ${desc}. ${style}`.trim();
+  }
+
+  // Final fallback if character_sheet is completely missing or unparseable
+  const title = world.title || "mysterious protagonist";
+  const style = world.style_lock ? `In the style of ${world.style_lock}` : "";
+  return `A high-quality cinematic reference portrait of ${title}. ${style}`.trim();
 }

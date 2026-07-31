@@ -21,7 +21,7 @@ export async function enqueueJob(input: EnqueueJobInput): Promise<GenerationJobR
       payload: input.payload ?? {},
       run_at: (input.runAt ?? new Date()).toISOString()
     })
-    .select("*")
+    .select("id, world_id, chapter_id, job_type, status, payload, checkpoint, retry_count, max_retries, run_at, worker_id, error_message, created_at, updated_at, started_at, finished_at")
     .single();
 
   if (error || !data) {
@@ -35,7 +35,7 @@ export async function enqueueJobIfMissing(input: EnqueueJobInput): Promise<Gener
   const supabase = getSupabaseAdmin();
   let query = supabase
     .from("generation_jobs")
-    .select("*")
+    .select("id, world_id, chapter_id, job_type, status, payload, checkpoint, retry_count, max_retries, run_at, worker_id, error_message, created_at, updated_at, started_at, finished_at")
     .eq("job_type", input.jobType)
     .in("status", ["queued", "retrying", "processing", "succeeded"]);
 
@@ -62,7 +62,7 @@ export async function enqueueJobIfMissing(input: EnqueueJobInput): Promise<Gener
 
 export async function getJob(jobId: string): Promise<GenerationJobRow> {
   const supabase = getSupabaseAdmin();
-  const { data, error } = await supabase.from("generation_jobs").select("*").eq("id", jobId).single();
+  const { data, error } = await supabase.from("generation_jobs").select("id, world_id, chapter_id, job_type, status, payload, checkpoint, retry_count, max_retries, run_at, worker_id, error_message, created_at, updated_at, started_at, finished_at").eq("id", jobId).single();
 
   if (error || !data) {
     throw new HttpError(error?.code === "PGRST116" ? 404 : 500, error?.message ?? "Job not found.");

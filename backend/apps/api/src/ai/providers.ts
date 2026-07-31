@@ -10,32 +10,7 @@ import type {
   ToolDefinition
 } from "./types.js";
 
-type GeminiResponse = {
-  promptFeedback?: {
-    blockReason?: string;
-    blockReasonMessage?: string;
-  };
-  candidates?: Array<{
-    finishReason?: string;
-    safetyRatings?: Array<{
-      category?: string;
-      probability?: string;
-      blocked?: boolean;
-    }>;
-    content?: {
-      parts?: Array<{
-        text?: string;
-        functionCall?: {
-          name?: string;
-          args?: unknown;
-        };
-      }>;
-    };
-  }>;
-  error?: {
-    message?: string;
-  };
-};
+
 
 export function getProviderStatuses(): ProviderStatus[] {
   return [
@@ -44,11 +19,7 @@ export function getProviderStatuses(): ProviderStatus[] {
       configured: Boolean(config.openrouter.apiKey),
       model: config.openrouter.model
     },
-    {
-      provider: "gemini",
-      configured: Boolean(config.gemini.apiKey),
-      model: config.gemini.model
-    },
+
     {
       provider: "nvidia",
       configured: Boolean(config.nvidia.apiKey),
@@ -65,12 +36,6 @@ export async function generateText(input: GenerateInput): Promise<GenerateOutput
         model: config.openrouter.model,
         text: await generateWithOpenRouter(input)
       };
-    case "gemini":
-      return {
-        provider: "gemini",
-        model: config.gemini.model,
-        text: await generateWithGemini(input)
-      };
     case "nvidia":
       return {
         provider: "nvidia",
@@ -83,21 +48,7 @@ export async function generateText(input: GenerateInput): Promise<GenerateOutput
 }
 
 export async function generateStructured(input: StructuredGenerateInput): Promise<StructuredGenerateOutput> {
-  try {
-    return await generateStructuredWithProvider(input.provider, input);
-  } catch (error) {
-    if (
-      input.allowNvidiaFallback &&
-      input.provider === "gemini" &&
-      error instanceof ProviderRequestError &&
-      isTransientProviderError(error)
-    ) {
-      console.warn("[text] Gemini transient failure, falling back to OpenRouter instead of NVIDIA due to NVIDIA outage...");
-      return generateStructuredWithProvider("openrouter", { ...input, provider: "openrouter", allowNvidiaFallback: false });
-    }
-
-    throw error;
-  }
+  return generateStructuredWithProvider(input.provider, input);
 }
 
 async function generateWithOpenRouter(input: GenerateInput) {
@@ -120,65 +71,12 @@ async function generateWithOpenRouter(input: GenerateInput) {
   });
 }
 
-async function generateWithGemini(input: GenerateInput) {
-  if (!config.gemini.apiKey) {
-    throw new ProviderSetupError("Gemini", "GEMINI_API_KEY");
-  }
-
-  const url = new URL(
-    `https://generativelanguage.googleapis.com/v1beta/models/${config.gemini.model}:generateContent`
-  );
-  url.searchParams.set("key", config.gemini.apiKey);
-
-  const response = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      systemInstruction: input.systemPrompt
-        ? {
-            parts: [{ text: input.systemPrompt }]
-          }
-        : undefined,
-      contents: [
-        {
-          role: "user",
-          parts: [{ text: input.prompt }]
-        }
-      ],
-      generationConfig: {
-        temperature: input.temperature ?? 0.7
-      }
-    })
-  });
-
-  const data = (await response.json().catch(() => ({}))) as GeminiResponse;
-
-  if (!response.ok) {
-    throw new ProviderRequestError("Gemini", data.error?.message ?? response.statusText, response.status);
-  }
-
-  const text = data.candidates?.[0]?.content?.parts
-    ?.map((part) => part.text)
-    .filter(Boolean)
-    .join("")
-    .trim();
-
-  if (!text) {
-    throw new ProviderRequestError("Gemini", "empty response text", response.status);
-  }
-
-  return text;
-}
 
 async function generateStructuredWithProvider(
   provider: AiProvider,
   input: StructuredGenerateInput
 ): Promise<StructuredGenerateOutput> {
   switch (provider) {
-    case "gemini":
-      return generateGeminiTool(input);
     case "openrouter":
       return generateOpenRouterTool(input);
     case "nvidia":
@@ -188,92 +86,6 @@ async function generateStructuredWithProvider(
   }
 }
 
-function sanitizeSchemaForGemini(schema: any): any {
-  if (schema === null || typeof schema !== "object") {
-    return schema;
-  }
-  if (Array.isArray(schema)) {
-    return schema.map(sanitizeSchemaForGemini);
-  }
-  const sanitized: any = {};
-  for (const key of Object.keys(schema)) {
-    if (key === "additionalProperties") {
-      continue;
-    }
-    sanitized[key] = sanitizeSchemaForGemini(schema[key]);
-  }
-  return sanitized;
-}
-
-async function generateGeminiTool(input: StructuredGenerateInput): Promise<StructuredGenerateOutput> {
-  if (!config.gemini.apiKey) {
-    throw new ProviderSetupError("Gemini", "GEMINI_API_KEY");
-  }
-
-  const url = new URL(`https://generativelanguage.googleapis.com/v1beta/models/${config.gemini.model}:generateContent`);
-  url.searchParams.set("key", config.gemini.apiKey);
-
-  const response = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      systemInstruction: { parts: [{ text: input.systemPrompt }] },
-      contents: [{ role: "user", parts: [{ text: input.prompt }] }],
-      generationConfig: { temperature: input.temperature ?? 0.7 },
-      tools: [
-        {
-          functionDeclarations: [
-            {
-              name: input.tool.name,
-              description: input.tool.description,
-              parameters: sanitizeSchemaForGemini(input.tool.parameters)
-            }
-          ]
-        }
-      ],
-      toolConfig: {
-        functionCallingConfig: {
-          mode: "ANY",
-          allowedFunctionNames: [input.tool.name]
-        }
-      }
-    })
-  });
-
-  const data = (await response.json().catch(() => ({}))) as GeminiResponse;
-  if (!response.ok) {
-    throw new ProviderRequestError("Gemini", data.error?.message ?? response.statusText, response.status);
-  }
-
-  const candidate = data.candidates?.[0];
-  const finishReason = candidate?.finishReason;
-  const blockedRating = candidate?.safetyRatings?.find((rating) => rating.blocked);
-  const promptBlock = data.promptFeedback?.blockReason;
-
-  if (promptBlock || blockedRating || finishReason === "SAFETY") {
-    throw new AiBlockedError("Gemini blocked this generation.", {
-      reason: data.promptFeedback?.blockReasonMessage ?? promptBlock ?? blockedRating?.category,
-      finishReason
-    });
-  }
-
-  const functionCall = candidate?.content?.parts
-    ?.map((part) => part.functionCall)
-    .find((call) => call?.name === input.tool.name);
-
-  if (!functionCall) {
-    // Treat as a retriable provider error, not a permanent safety block —
-    // this happens when Gemini returns text instead of a tool call (transient conformance failure).
-    throw new ProviderRequestError("Gemini", `Did not return the required structured result (finishReason: ${finishReason})`, 500);
-  }
-
-  return {
-    provider: "gemini",
-    model: config.gemini.model,
-    arguments: functionCall.args ?? {},
-    safety: { status: "passed", finishReason }
-  };
-}
 
 async function generateOpenRouterTool(input: StructuredGenerateInput): Promise<StructuredGenerateOutput> {
   if (!config.openrouter.apiKey) {
@@ -347,5 +159,5 @@ function isTransientProviderError(error: ProviderRequestError) {
 }
 
 export function isAiProvider(value: string): value is AiProvider {
-  return value === "openrouter" || value === "gemini" || value === "nvidia";
+  return value === "openrouter" || value === "nvidia";
 }

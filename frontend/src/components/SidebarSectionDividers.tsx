@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
+import Image from "next/image";
 import { useTheme } from "next-themes";
 import { Sun, Moon } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -98,6 +99,18 @@ export function SidebarSectionDividersDemo() {
 
   const isWorkspace = pathname?.startsWith("/workspace");
 
+  const itemColors: Record<string, { active: string; hover: string; glow: string }> = {
+    "Home": { active: "#FF9800", hover: "#FFB74D", glow: "rgba(255, 152, 0, 0.08)" },
+    "Dashboard": { active: "#00D6FF", hover: "#33E0FF", glow: "rgba(0, 214, 255, 0.08)" },
+    "Genesis Engine": { active: "#B026FF", hover: "#C55BFF", glow: "rgba(176, 38, 255, 0.08)" },
+    "Workspace": { active: "#00E676", hover: "#33F091", glow: "rgba(0, 230, 118, 0.08)" },
+    "Story Archives": { active: "#FFD700", hover: "#FFE033", glow: "rgba(255, 215, 0, 0.08)" },
+    "On-Chain Provenance": { active: "#EC4899", hover: "#F472B6", glow: "rgba(236, 72, 153, 0.08)" },
+    "Support & Docs": { active: "#FF5722", hover: "#FF7A50", glow: "rgba(255, 87, 34, 0.08)" },
+    "OKX X Layer Faucet": { active: "#8E24AA", hover: "#AB47BC", glow: "rgba(142, 36, 170, 0.08)" },
+    "Projects & Worlds": { active: "#FFEB3B", hover: "#FFF176", glow: "rgba(255, 235, 59, 0.08)" }
+  };
+
   const navItems: NavItem[] = [
     {
       label: "Home",
@@ -175,12 +188,32 @@ export function SidebarSectionDividersDemo() {
       transition={{ type: "spring", stiffness: 300, damping: 30 }}
       style={styles.aside}
     >
+      <style dangerouslySetInnerHTML={{__html: `
+        .sidebar-nav-link {
+          transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
+        }
+        .sidebar-nav-link:hover {
+          background: rgba(255, 255, 255, 0.05) !important;
+          border-color: rgba(255, 255, 255, 0.1) !important;
+        }
+        .sidebar-nav-link:hover svg {
+          filter: drop-shadow(0 0 5px currentColor);
+        }
+        .sidebar-logo-glow {
+          filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.15));
+          animation: logo-pulse 4s ease-in-out infinite alternate;
+        }
+        @keyframes logo-pulse {
+          0% { filter: drop-shadow(0 0 3px rgba(255, 255, 255, 0.1)); }
+          100% { filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.25)); }
+        }
+      `}} />
       {/* Top Header & Collapse Toggle */}
       <div style={isSidebarOpen ? styles.topHeader : styles.topHeaderCollapsed}>
         {isSidebarOpen ? (
           <>
             <Link href="/" style={styles.logoGroup}>
-              <svg width="28" height="28" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0 }}>
+              <svg className="sidebar-logo-glow" width="28" height="28" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0 }}>
                 <g filter="url(#sidebar_logo_filter0)">
                   <g clipPath="url(#sidebar_logo_clip0)">
                     <rect width="48" height="48" rx="12" fill="#0A0A0A"/>
@@ -255,7 +288,7 @@ export function SidebarSectionDividersDemo() {
         ) : (
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "18px", width: "100%" }}>
             <Link href="/" style={{ display: "flex", justifyContent: "center" }}>
-              <svg width="28" height="28" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <svg className="sidebar-logo-glow" width="28" height="28" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <g filter="url(#sidebar_logo_collapsed_filter0)">
                   <g clipPath="url(#sidebar_logo_collapsed_clip0)">
                     <rect width="48" height="48" rx="12" fill="#0A0A0A"/>
@@ -364,6 +397,7 @@ export function SidebarSectionDividersDemo() {
           const isActive = item.href ? pathname === item.href.split("?")[0] : false;
           const hasItems = Array.isArray(item.items) && item.items.length > 0;
           const isSubOpen = openSubmenus[item.label] ?? false;
+          const colors = itemColors[item.label] || { active: "#B026FF", hover: "rgba(255, 255, 255, 0.05)", glow: "rgba(176, 38, 255, 0.08)" };
 
           return (
             <div key={item.label} style={styles.navItemWrapper}>
@@ -440,18 +474,41 @@ export function SidebarSectionDividersDemo() {
               ) : (
                 <Link
                   href={item.href || "#"}
+                  className="sidebar-nav-link"
                   style={{
                     ...styles.navLink,
-                    ...(isActive ? styles.navLinkActive : {}),
                     padding: isSidebarOpen ? "10px 12px" : "10px 0",
                     justifyContent: isSidebarOpen ? "space-between" : "center",
+                    position: "relative",
+                    background: isActive ? (colors.glow || "rgba(255,255,255,0.03)") : "transparent",
+                    border: isActive ? `1px solid ${colors.active}30` : "1px solid transparent",
+                    boxShadow: isActive ? `0 0 15px ${colors.glow}` : "none",
+                    borderRadius: "8px",
                   }}
                 >
+                  {isActive && (
+                    <div 
+                      style={{
+                        position: "absolute",
+                        left: isSidebarOpen ? "-4px" : "2px",
+                        width: "3px",
+                        height: "18px",
+                        background: colors.active,
+                        borderRadius: "0 4px 4px 0",
+                        boxShadow: `0 0 10px ${colors.active}`
+                      }} 
+                    />
+                  )}
                   <div style={styles.navLabelGroup}>
                     {Icon && (
                       <Icon
                         size={18}
-                        style={isActive ? styles.iconActive : styles.iconMuted}
+                        style={{
+                          color: isActive ? colors.active : "var(--text-muted)",
+                          flexShrink: 0,
+                          transition: "all 0.2s ease",
+                          filter: isActive ? `drop-shadow(0 0 4px ${colors.active}50)` : "none"
+                        }}
                       />
                     )}
                     {isSidebarOpen && (
@@ -488,12 +545,12 @@ export function SidebarSectionDividersDemo() {
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px", width: "100%" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "12px", minWidth: 0, flex: 1 }}>
             {avatarUrl ? (
-              <img 
+              <Image 
                 src={avatarUrl} 
                 alt={displayName} 
+                width={32}
+                height={32}
                 style={{
-                  width: "32px",
-                  height: "32px",
                   borderRadius: "50%",
                   objectFit: "cover",
                   border: "1px solid rgba(255, 255, 255, 0.1)",
@@ -793,7 +850,7 @@ const styles: Record<string, React.CSSProperties> = {
     textDecoration: "none",
     transition: "all 0.15s ease",
   },
-  navItemActive: {
+  navLinkActive: {
     background: "var(--card-bg)",
     border: "1px solid var(--card-border)",
     color: "hsl(var(--foreground))",

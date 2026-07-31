@@ -1,5 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
+import { generateProductionPlans } from "../services/director.js";
+import { getSupabaseAdmin } from "../db/supabase.js";
 import { asyncRoute } from "../http/asyncRoute.js";
 import { stringParam } from "../http/params.js";
 import {
@@ -7,6 +9,7 @@ import {
   createNextChapter,
   createWorld,
   deleteChapter,
+  deleteWorld,
   getCanon,
   getWorldDetails,
   intakeSchema,
@@ -25,7 +28,7 @@ const createWorldSchema = z.object({
   title: z.string().trim().min(1).optional(),
   intake: intakeSchema.optional(),
   styleLock: z.string().trim().min(1).optional(),
-  aiProvider: z.enum(["gemini", "openrouter", "nvidia"]).optional()
+  aiProvider: z.enum(["openrouter", "nvidia"]).optional()
 });
 
 export const worldsRouter = Router();
@@ -177,6 +180,48 @@ worldsRouter.patch(
       parsed.content,
       parsed.sceneDescription
     );
+    res.json(result);
+  })
+);
+
+const generatePlansSchema = z.object({
+  budgetHbar: z.number().min(1)
+});
+
+worldsRouter.post(
+  "/:worldId/plans",
+  asyncRoute(async (req, res) => {
+    const parsed = generatePlansSchema.parse(req.body);
+    await generateProductionPlans(stringParam(req.params.worldId, "worldId"), parsed.budgetHbar);
+    
+    const supabase = getSupabaseAdmin();
+    const { data: plans } = await supabase.from("production_plans").select("id, world_id, plan_type, estimated_cost_hbar, estimated_duration_ms, estimated_quality_score, provider_allocations, created_at").eq("world_id", req.params.worldId);
+    res.json({ plans });
+  })
+);
+
+worldsRouter.get(
+  "/:worldId/plans",
+  asyncRoute(async (req, res) => {
+    const supabase = getSupabaseAdmin();
+    const { data: plans } = await supabase.from("production_plans").select("id, world_id, plan_type, estimated_cost_hbar, estimated_duration_ms, estimated_quality_score, provider_allocations, created_at").eq("world_id", req.params.worldId);
+    res.json({ plans });
+  })
+);
+
+worldsRouter.get(
+  "/:worldId/procurements",
+  asyncRoute(async (req, res) => {
+    const supabase = getSupabaseAdmin();
+    const { data: procurements } = await supabase.from("procurements").select("id, world_id, chapter_id, provider_id, task_type, status, cost_hbar, payment_receipt, hashscan_url, asset_url, created_at, updated_at, provider_registry(name, category)").eq("world_id", req.params.worldId);
+    res.json({ procurements });
+  })
+);
+
+worldsRouter.delete(
+  "/:worldId",
+  asyncRoute(async (req, res) => {
+    const result = await deleteWorld(stringParam(req.params.worldId, "worldId"));
     res.json(result);
   })
 );
