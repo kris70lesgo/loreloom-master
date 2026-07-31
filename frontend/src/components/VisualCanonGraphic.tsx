@@ -3,6 +3,7 @@
 import React from "react";
 import { AntiGravitySynthesizer } from "./AntiGravitySynthesizer";
 import { VisualSynthesisOverlay } from "./VisualSynthesisOverlay";
+import Image from "next/image";
 
 /**
  * Procedural SVG graphic component for the Main Canvas.
@@ -15,7 +16,7 @@ import { VisualSynthesisOverlay } from "./VisualSynthesisOverlay";
  * - Seeds containing "islands", "sky", or "aether" → golden-islands SVG
  * - Everything else → core-glow SVG
  */
-export function VisualCanonGraphic({
+export const VisualCanonGraphic = React.memo(function VisualCanonGraphic({
   seed,
   onRetrigger,
   previousSeed,
@@ -43,7 +44,7 @@ export function VisualCanonGraphic({
       }}>
         {previousSeed && previousSeed.startsWith("http") && (
           <div style={{ position: "absolute", inset: 0, opacity: 0.15, filter: "grayscale(1) blur(2px)" }}>
-            <img src={previousSeed} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+            <Image src={previousSeed} alt="" fill unoptimized style={{ objectFit: "cover" }} />
           </div>
         )}
         {(isGenerating || seed === "awaiting-synthesis") ? (
@@ -88,10 +89,12 @@ export function VisualCanonGraphic({
       
     return (
       <div data-testid="vcg-image" style={{ width: "100%", height: "100%", position: "relative" }}>
-        <img
+        <Image
           src={imgSrc}
           alt="Visual Synthesis Render"
-          style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "10px", display: "block" }}
+          fill
+          unoptimized
+          style={{ objectFit: "cover", borderRadius: "10px", display: "block" }}
         />
       </div>
     );
@@ -100,4 +103,4 @@ export function VisualCanonGraphic({
   return (
     <div data-testid="vcg-core" style={{ width: "100%", height: "100%", position: "relative", background: "rgba(0,0,0,0.1)", borderRadius: "10px" }} />
   );
-}
+});

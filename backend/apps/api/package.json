@@ -11,9 +11,13 @@
     "start": "node dist/server.js",
     "start:worker": "node dist/worker.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "tsx --test src/ai/*.test.ts src/services/*.test.ts"
+    "test": "tsx --test src/ai/*.test.ts src/services/*.test.ts src/utils/__tests__/*.test.ts",
+    "test:bazaar": "tsx src/scripts/test-bazaar-discovery.ts",
+    "test:chaos": "tsx src/scripts/test-chaos-recovery.ts",
+    "test:image": "tsx src/scripts/test-image-gen.ts"
   },
   "dependencies": {
+    "@hashgraph/sdk": "^2.81.0",
     "@supabase/supabase-js": "^2.110.2",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
@@ -25,6 +29,7 @@
     "@types/express": "^5.0.0",
     "@types/node": "^22.10.2",
     "tsx": "^4.19.2",
-    "typescript": "^5.7.2"
+    "typescript": "^5.7.2",
+    "vitest": "^4.1.10"
   }
 }

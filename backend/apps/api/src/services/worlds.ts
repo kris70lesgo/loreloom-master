@@ -196,6 +196,54 @@ export async function createNextChapter(worldId: string) {
   return { world, chapter: chapter as ChapterRow, job };
 }
 
+/**
+ * Persists an image produced outside the queued chapter pipeline (for example,
+ * a live procurement run) as a real chapter artifact.  Keeping this here means
+ * the image remains available after a refresh and in the visual gallery.
+ */
+export async function saveProductionImage(input: {
+  worldId: string;
+  prompt: string;
+  imageUrl: string;
+}): Promise<ChapterRow> {
+  const supabase = getSupabaseAdmin();
+  const world = await getWorldRow(input.worldId);
+
+  const { data: latest, error: latestError } = await supabase
+    .from("chapters")
+    .select("chapter_index")
+    .eq("world_id", world.id)
+    .order("chapter_index", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (latestError) {
+    throw new HttpError(500, latestError.message);
+  }
+
+  const { data: chapter, error } = await supabase
+    .from("chapters")
+    .insert({
+      world_id: world.id,
+      chapter_index: ((latest?.chapter_index as number | undefined) ?? 0) + 1,
+      content: input.prompt,
+      scene_description: input.prompt,
+      image_url: input.imageUrl,
+      status: "image_ready"
+    })
+    .select("*")
+    .single();
+
+  if (error || !chapter) {
+    if (isUniqueViolation(error)) {
+      throw new HttpError(409, "Another production artifact was saved concurrently. Please run production again.");
+    }
+    throw new HttpError(500, error?.message ?? "Could not save the generated image.");
+  }
+
+  return chapter as ChapterRow;
+}
+
 export async function regenerateChapterImage(
   worldId: string,
   chapterId: string,
@@ -453,4 +501,36 @@ export async function listUserWorlds(creatorIdOrWallet: string) {
   }
 
   return { worlds: worlds || [] };
+}
+
+export async function deleteWorld(worldId: string) {
+  const supabase = getSupabaseAdmin();
+  
+  // Verify world exists
+  const { data: world, error: fetchError } = await supabase
+    .from("worlds")
+    .select("id")
+    .eq("id", worldId)
+    .single();
+
+  if (fetchError || !world) {
+    throw new HttpError(404, "World not found.");
+  }
+
+  // Explicitly delete related records to prevent FK constraints issues if CASCADE is missing
+  await supabase.from("generation_jobs").delete().eq("world_id", worldId);
+  await supabase.from("procurements").delete().eq("world_id", worldId);
+  await supabase.from("chapters").delete().eq("world_id", worldId);
+
+  // Delete the world.
+  const { error: deleteError } = await supabase
+    .from("worlds")
+    .delete()
+    .eq("id", worldId);
+
+  if (deleteError) {
+    throw new HttpError(500, deleteError.message);
+  }
+
+  return { success: true };
 }

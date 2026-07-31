@@ -1,9 +1,11 @@
 "use client";
 
-import React, { useRef, useEffect } from "react";
+import React, { useRef, useEffect, useState } from "react";
 import Link from "next/link";
 import { Upload, SquareArrowOutUpRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { createClient } from "@/lib/supabase/client";
+import { User } from "@supabase/supabase-js";
 
 function NavButton({
   children,
@@ -25,6 +27,7 @@ function NavButton({
 export function Hero() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [user, setUser] = useState<User | null>(null);
 
   useEffect(() => {
     if (videoRef.current) {
@@ -33,7 +36,18 @@ export function Hero() {
         console.warn("Video playback notice:", err);
       });
     }
+
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      setUser(user);
+    });
   }, []);
+
+  const handleLogout = async () => {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    setUser(null);
+  };
 
   return (
     <section className="relative h-screen w-full overflow-hidden flex flex-col justify-between">
@@ -84,29 +98,47 @@ export function Hero() {
             <NavButton>FAQs</NavButton>
           </div>
 
-          {/* Right: Auth Links & Split Sign Up Button */}
+          {/* Right: Auth Links & Sign Up / Logout Button */}
           <div className="flex items-center gap-6 md:gap-8">
-            <Link href="/login" className="hidden md:block">
-              <button className="bg-transparent border-none cursor-pointer font-sans text-[13px] font-semibold uppercase text-[#292929] tracking-[0.04em] transition-opacity hover:opacity-55 whitespace-nowrap">
-                Login
-              </button>
-            </Link>
-            <Link href="/login" className="inline-flex items-center">
-              <div className="inline-flex -space-x-px rounded-lg border border-black/80 bg-wandor-dark text-[#fafafa] overflow-hidden shadow-sm shadow-black/10 rtl:space-x-reverse">
-                <Button
-                  className="rounded-none shadow-none bg-wandor-dark hover:bg-[#222] text-[#fafafa] font-sans text-[10px] font-semibold uppercase tracking-[0.06em] px-6 h-8 border-r border-white/20 border-t-0 border-b-0 border-l-0 cursor-pointer"
+            {user ? (
+              <>
+                <Link href="/dashboard" className="hidden md:block">
+                  <button className="bg-transparent border-none cursor-pointer font-sans text-[13px] font-semibold uppercase text-[#292929] tracking-[0.04em] transition-opacity hover:opacity-55 whitespace-nowrap">
+                    Dashboard
+                  </button>
+                </Link>
+                <button
+                  onClick={handleLogout}
+                  className="bg-transparent border-none cursor-pointer font-sans text-[13px] font-semibold uppercase text-[#ef4444] tracking-[0.04em] transition-opacity hover:opacity-55 whitespace-nowrap"
                 >
-                  Sign Up
-                </Button>
-                <Button
-                  className="rounded-none shadow-none bg-wandor-dark hover:bg-[#222] text-[#fafafa] h-8 w-8 p-0 flex items-center justify-center border-none cursor-pointer"
-                  size="icon"
-                  aria-label="Open link"
-                >
-                  <SquareArrowOutUpRight size={12} strokeWidth={2} aria-hidden="true" />
-                </Button>
-              </div>
-            </Link>
+                  Logout
+                </button>
+              </>
+            ) : (
+              <>
+                <Link href="/login" className="hidden md:block">
+                  <button className="bg-transparent border-none cursor-pointer font-sans text-[13px] font-semibold uppercase text-[#292929] tracking-[0.04em] transition-opacity hover:opacity-55 whitespace-nowrap">
+                    Login
+                  </button>
+                </Link>
+                <Link href="/login" className="inline-flex items-center">
+                  <div className="inline-flex -space-x-px rounded-lg border border-black/80 bg-wandor-dark text-[#fafafa] overflow-hidden shadow-sm shadow-black/10 rtl:space-x-reverse">
+                    <Button
+                      className="rounded-none shadow-none bg-wandor-dark hover:bg-[#222] text-[#fafafa] font-sans text-[10px] font-semibold uppercase tracking-[0.06em] px-6 h-8 border-r border-white/20 border-t-0 border-b-0 border-l-0 cursor-pointer"
+                    >
+                      Sign Up
+                    </Button>
+                    <Button
+                      className="rounded-none shadow-none bg-wandor-dark hover:bg-[#222] text-[#fafafa] h-8 w-8 p-0 flex items-center justify-center border-none cursor-pointer"
+                      size="icon"
+                      aria-label="Open link"
+                    >
+                      <SquareArrowOutUpRight size={12} strokeWidth={2} aria-hidden="true" />
+                    </Button>
+                  </div>
+                </Link>
+              </>
+            )}
           </div>
         </nav>
 
@@ -148,7 +180,7 @@ export function Hero() {
             </button>
 
             {/* Start Creating Button inside card */}
-            <Link href="/genesis" className="absolute bottom-[21px] right-[21px] inline-flex items-center">
+            <Link href={user ? "/genesis" : "/login?redirect=/genesis"} className="absolute bottom-[21px] right-[21px] inline-flex items-center">
               <span className="w-[160px] h-14 bg-black border-none rounded-[44px] shadow-[0_0_2px_0_rgba(0,0,0,0.05)] cursor-pointer flex items-center justify-center font-sans text-base font-medium text-[#fafafa] uppercase tracking-[0.02em] transition-all hover:bg-[#333] active:scale-95 leading-none">
                 Start Creating
               </span>

@@ -20,7 +20,7 @@ for (const envPath of envRoots.map((envPath) => envPath.replace(/\.env$/, ".env.
   }
 }
 
-export type AiProvider = "openrouter" | "gemini" | "nvidia";
+export type AiProvider = "openrouter" | "nvidia";
 
 export const config = {
   port: Number(process.env.PORT ?? 4000),
@@ -44,19 +44,9 @@ export const config = {
     appUrl: process.env.OPENROUTER_APP_URL ?? "http://localhost:3000",
     appName: process.env.OPENROUTER_APP_NAME ?? "Loreloom"
   },
-  gemini: {
-    apiKey: process.env.GEMINI_API_KEY,
-    model: process.env.GEMINI_MODEL ?? "gemini-2.0-flash-lite-001",
-    imageModel: process.env.GEMINI_IMAGE_MODEL ?? process.env.GEMINI_IMAGE_FAST_MODEL ?? "gemini-2.0-flash-exp-image-generation",
-    imageProModel: process.env.GEMINI_IMAGE_PRO_MODEL ?? "imagen-3.0-generate-001"
-  },
   nvidia: {
     apiKey: process.env.NVIDIA_API_KEY,
     model: process.env.NVIDIA_MODEL ?? "meta/llama-3.1-70b-instruct"
-  },
-  huggingface: {
-    apiKey: process.env.HUGGINGFACE_API_KEY ?? process.env.HF_TOKEN,
-    imageModel: process.env.HUGGINGFACE_IMAGE_MODEL ?? "black-forest-labs/FLUX.1-schnell"
   },
   stability: {
     apiKey: process.env.STABILITY_API_KEY
@@ -79,5 +69,19 @@ export const config = {
     deployerAddress: process.env.THIRDWEB_DEPLOYER_ADDRESS,
     genesisContractAddress: process.env.GENESIS_CONTRACT_ADDRESS,
     chapterContractAddress: process.env.CHAPTER_CONTRACT_ADDRESS
+  },
+  procurement: {
+    useLiveNetwork: process.env.USE_LIVE_NETWORK === "true",
+    hederaAccountId: process.env.HEDERA_TESTNET_ACCOUNT_ID,
+    hederaPrivateKey: process.env.HEDERA_TESTNET_PRIVATE_KEY,
+    mockX402: process.env.MOCK_X402 !== "false",
+    defaultCurrency: process.env.PROCUREMENT_CURRENCY ?? "HBAR",
+    hederaHashscanUrl: process.env.HEDERA_HASHSCAN_URL ?? "https://hashscan.io/testnet/transaction",
+    utilityWeights: {
+      quality: Number(process.env.UTILITY_WEIGHT_QUALITY ?? 1.5),
+      cost: Number(process.env.UTILITY_WEIGHT_COST ?? 2.0),
+      reliability: Number(process.env.UTILITY_WEIGHT_RELIABILITY ?? 1.0),
+      latency: Number(process.env.UTILITY_WEIGHT_LATENCY ?? 0.5)
+    }
   }
 } as const;

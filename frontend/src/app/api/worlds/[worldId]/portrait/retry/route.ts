@@ -1,0 +1,22 @@
+import { NextResponse } from "next/server";
+import { regeneratePortrait } from "@/server/services/worlds";
+import { errorResponse } from "@/server/http/nextError";
+
+export const dynamic = "force-dynamic";
+
+export async function POST(_request: Request, ctx: RouteContext<"/api/worlds/[worldId]/portrait/retry">) {
+  const { worldId } = await ctx.params;
+  if (!worldId) {
+    return NextResponse.json({ error: "worldId is required." }, { status: 400 });
+  }
+
+  try {
+    const result = await regeneratePortrait(worldId);
+    return NextResponse.json(
+      { ...result, message: "Let's try that portrait differently before it becomes permanent." },
+      { status: 202 }
+    );
+  } catch (error) {
+    return errorResponse(error);
+  }
+}

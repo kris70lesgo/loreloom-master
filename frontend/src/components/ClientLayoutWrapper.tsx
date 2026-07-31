@@ -26,7 +26,7 @@ export default function ClientLayoutWrapper({ children }: { children: React.Reac
         <div style={styles.footerContainer}>
           <div style={styles.footerLeft}>
             <span className="title-cyber" style={styles.footerLogo}>LORELOOM</span>
-            <p style={styles.footerDesc}>AI Art Director for Visual Canons & On-Chain Lineage.</p>
+            <p style={styles.footerDesc}>AI Art Director for Visual Stories & On-Chain Provenance.</p>
           </div>
           <div style={styles.footerRight}>
             <span className="badge badge-gray" style={styles.footerContract}>

@@ -566,7 +566,7 @@ export default function GenesisPage() {
         }
 
         // Only timeout if we haven't even generated the text character sheet yet!
-        if (attempts > 60 && !hasCharSheet) {
+        if (attempts > 150 && !hasCharSheet) {
           if (isMounted) {
             setError("Generation timed out. The background worker is taking longer than expected.");
           }

@@ -39,3 +39,7 @@ npm run dev
 
 ## 📄 License
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Next.js backend connection
+
+The Next.js app in `frontend/` is the user interface; it calls the Express API in `backend/apps/api/` through `NEXT_PUBLIC_API_URL` (normally `http://localhost:4000`). Run the frontend, API, and worker together with `npm run dev` from the repository root. Generated images and chapter updates are persisted by the API to Supabase, not only held in browser state.

@@ -52,7 +52,7 @@ interface StoryContextType {
   regenerateChapterImage: (chapterId: string, options?: { narrativeContext?: string; styleLock?: string; aspectRatio?: string }) => Promise<void>;
   commitChapterToCanon: (chapterId: string) => void;
   switchWorld: (worldId: string) => void;
-  deleteWorld: (worldId: string) => void;
+  deleteWorld: (worldId: string) => Promise<void>;
   deleteChapter: (chapterId: string) => Promise<void>;
   fetchWorld: (worldId: string) => Promise<boolean>;
   reorderChapters: (chapterIds: string[]) => void;
@@ -97,7 +97,7 @@ function mapBackendWorld(backendWorld: BackendWorldRow, backendChapters: Backend
     protagonistName: (charSheet.name as string) || (intake.protagonistName as string) || "Unnamed",
     protagonistDesc: (charSheet.characterSummary as string) || (intake.protagonistDesc as string) || "No description.",
     relicName: (intake.relicName as string) || "None",
-    createdAt: backendWorld.created_at,
+    createdAt: backendWorld.created_at || new Date().toISOString(),
     status: backendWorld.status,
     referenceImageUrl: backendWorld.reference_image_url,
     chapters: (backendChapters || []).map((ch, idx) => ({
@@ -446,14 +446,24 @@ export const StoryProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setActiveWorldId(worldId);
   };
 
-  const deleteWorld = (worldId: string) => {
-    setWorlds((prev) => {
-      const nextWorlds = prev.filter((w) => w.id !== worldId);
-      if (activeWorldId === worldId) {
-        setActiveWorldId(nextWorlds.length > 0 ? nextWorlds[0].id : null);
+  const deleteWorld = async (worldId: string) => {
+    try {
+      const response = await fetch(`${API_URL}/api/worlds/${worldId}`, {
+        method: "DELETE",
+      });
+      if (!response.ok) {
+        throw new Error("Failed to delete world on the server.");
       }
-      return nextWorlds;
-    });
+      setWorlds((prev) => {
+        const nextWorlds = prev.filter((w) => w.id !== worldId);
+        if (activeWorldId === worldId) {
+          setActiveWorldId(nextWorlds.length > 0 ? nextWorlds[0].id : null);
+        }
+        return nextWorlds;
+      });
+    } catch (err) {
+      console.error("Error deleting world:", err);
+    }
   };
 
   const reorderChapters = (chapterIds: string[]) => {

@@ -192,7 +192,7 @@ export default function DashboardPage() {
                   <div style={{display: "flex", justifyContent: "space-between", alignItems: "flex-start", width: "100%"}}>
                     <div style={styles.recentInfo}>
                       <h3 style={styles.recentProjectName}>{world.name}</h3>
-                      <p style={styles.recentProjectMeta}>Kaito-X · Created {world.createdAt.split('T')[0]}</p>
+                      <p style={styles.recentProjectMeta}>Kaito-X · Created {(world.createdAt || (world as any).created_at || new Date().toISOString()).split('T')[0]}</p>
                     </div>
                     <div style={{position: "relative"}}>
                       <button 
