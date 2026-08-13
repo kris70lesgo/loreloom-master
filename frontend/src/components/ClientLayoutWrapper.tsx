@@ -19,10 +19,10 @@ export default function ClientLayoutWrapper({ children }: { children: React.Reac
   return (
     <>
       <Navbar />
-      <main style={styles.main}>
+      <main data-loreloom-shell-main style={styles.main}>
         {children}
       </main>
-      <footer style={styles.footer}>
+      <footer data-loreloom-shell-footer style={styles.footer}>
         <div style={styles.footerContainer}>
           <div style={styles.footerLeft}>
             <span className="title-cyber" style={styles.footerLogo}>LORELOOM</span>

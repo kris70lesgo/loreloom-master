@@ -6,7 +6,7 @@ import { HttpError, isUniqueViolation } from "@/server/http/errors";
 import { enqueueJob, enqueueJobIfMissing } from "@/server/services/jobs";
 import { getOrCreateUser } from "@/server/services/users";
 
-export const intakeSchema = z.record(z.unknown()).default({});
+export const intakeSchema = z.record(z.string(), z.unknown()).default({});
 
 export async function createWorld(input: {
   walletAddress: string;
@@ -410,19 +410,18 @@ export async function updateChapterContent(
       systemPrompt: "Return only the protagonist's name, nothing else."
     });
     const extractedName = result.text?.trim();
-      if (extractedName && extractedName !== "NONE" && extractedName.length < 50) {
-        if (typeof characterSheet === "object" && characterSheet !== null && !Array.isArray(characterSheet)) {
-          const cs = { ...characterSheet } as Record<string, any>;
-          if (cs.name !== extractedName) {
-            console.log(`[memory] Protagonist name updated from ${cs.name} to ${extractedName}`);
-            cs.name = extractedName;
-            characterSheet = cs;
-            
-            await supabase
-              .from("worlds")
-              .update({ character_sheet: characterSheet })
-              .eq("id", world.id);
-          }
+    if (extractedName && extractedName !== "NONE" && extractedName.length < 50) {
+      if (typeof characterSheet === "object" && characterSheet !== null && !Array.isArray(characterSheet)) {
+        const cs = { ...characterSheet } as Record<string, any>;
+        if (cs.name !== extractedName) {
+          console.log(`[memory] Protagonist name updated from ${cs.name} to ${extractedName}`);
+          cs.name = extractedName;
+          characterSheet = cs;
+
+          await supabase
+            .from("worlds")
+            .update({ character_sheet: characterSheet })
+            .eq("id", world.id);
         }
       }
     }

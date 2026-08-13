@@ -4,6 +4,7 @@ import { config } from "./config.js";
 import { hasSupabaseAdminConfig } from "./db/supabase.js";
 import { HttpError } from "./http/errors.js";
 import { aiRouter } from "./routes/ai.js";
+import { heritageRouter } from "./routes/heritage.js";
 import { jobsRouter } from "./routes/jobs.js";
 import { usersRouter } from "./routes/users.js";
 import { worldsRouter } from "./routes/worlds.js";
@@ -42,6 +43,7 @@ export function createApp() {
   app.use("/api/users", usersRouter);
   app.use("/api/jobs", jobsRouter);
   app.use("/api/worlds", worldsRouter);
+  app.use("/api/heritage", heritageRouter);
 
   app.get("/test-402-provider", async (req, res) => {
     const receipt = req.headers["x-payment-receipt"];

@@ -1,4 +1,3 @@
-import { Client, TransferTransaction, Hbar, PrivateKey, AccountId } from "@hashgraph/sdk";
 import { config } from "../config.js";
 
 export class x402PaymentError extends Error {
@@ -104,6 +103,7 @@ export async function fetchWithx402(url: string, options: RequestInit = {}): Pro
     }
 
     console.log(`[x402 Interceptor] 🔐 Building live Hedera TransferTransaction...`);
+    const { Client, TransferTransaction, Hbar, PrivateKey, AccountId } = await import("@hashgraph/sdk");
     
     const client = Client.forTestnet();
     const myAccountId = AccountId.fromString(config.procurement.hederaAccountId);
@@ -199,6 +199,7 @@ export async function fetchWithx402(url: string, options: RequestInit = {}): Pro
 
     if (config.procurement.useLiveNetwork) {
       console.log(`[x402 Interceptor] 🔄 Falling back to direct on-chain submission...`);
+      const { Client, TransferTransaction, Hbar, PrivateKey, AccountId } = await import("@hashgraph/sdk");
       
       const client = Client.forTestnet();
       const myAccountId = AccountId.fromString(config.procurement.hederaAccountId!);

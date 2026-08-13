@@ -2,9 +2,10 @@ import { z } from "zod";
 import { AiBlockedError, ProviderRequestError } from "../ai/errors.js";
 import { generateStructured } from "../ai/providers.js";
 import type { StructuredGenerateOutput, ToolDefinition } from "../ai/types.js";
+import type { ResearchEvidence } from "../ai/research.js";
 import type { AiProvider } from "../config.js";
 import type { ChapterRow, JsonValue, WorldRow } from "../db/types.js";
-import { fetchVisualKnowledge } from "./knowledge.js";
+import { researchHeritageSubject, type HeritageResearchInput } from "./heritageResearch.js";
 
 const shortText = (max: number) => z.string().trim().min(1).max(max);
 const factsSchema = z.array(shortText(300)).max(6); // Reduced from 12 to 6
@@ -39,7 +40,7 @@ export type ChapterDraft = z.infer<typeof chapterOutputSchema>;
 
 const genesisTool: ToolDefinition = {
   name: "submit_genesis",
-  description: "Submit the canonical Genesis world package.",
+  description: "Submit the structured cultural heritage experience package.",
   parameters: {
     type: "object",
     additionalProperties: false,
@@ -78,7 +79,7 @@ const genesisTool: ToolDefinition = {
 
 const chapterTool: ToolDefinition = {
   name: "submit_chapter",
-  description: "Submit the next canonical Loreloom chapter and its updated story bible.",
+  description: "Submit the next heritage experience chapter and its updated cultural canon.",
   parameters: {
     type: "object",
     additionalProperties: false,
@@ -96,64 +97,109 @@ export async function generateGenesisDraft(input: {
   intake: JsonValue;
   styleLock?: string | null;
   provider?: AiProvider;
-}): Promise<{ draft: GenesisDraft; generation: StructuredGenerateOutput; validationAttempt: number }> {
+}): Promise<{ draft: GenesisDraft; generation: StructuredGenerateOutput; validationAttempt: number; research?: ResearchEvidence }> {
+  // Extract heritage subject from intake
   const userPrompt = typeof input.intake === "object" && input.intake !== null
     ? String((input.intake as any).prompt || (input.intake as any).name || (input.intake as any).premise || "")
     : "";
-  const grounding = await fetchVisualKnowledge(userPrompt);
+
+  // Perform heritage research via Tavily
+  let researchEvidence: ResearchEvidence | null = null;
+  try {
+    const researchInput: HeritageResearchInput = {
+      subject: userPrompt,
+      category: typeof input.intake === "object" && input.intake !== null
+        ? String((input.intake as any).heritageCategory || undefined)
+        : undefined
+    };
+    researchEvidence = await researchHeritageSubject(researchInput);
+  } catch (err) {
+    console.warn("[story] Heritage research failed, continuing without:", err);
+  }
+
+  // Build research context from evidence
+  const researchContext = researchEvidence
+    ? formatResearchForPrompt(researchEvidence)
+    : "";
 
   const prompt = [
-    "Transform this raw Loreloom character intake into a locked canon package.",
+    "Transform this Karnataka heritage subject into a structured cultural experience package.",
     `Intake: ${JSON.stringify(input.intake)}`,
     `Requested style lock: ${input.styleLock ?? "none"}`,
-    grounding ? `Real-world Lore & Visual Grounding: ${grounding}` : "",
+    researchContext ? `Heritage Research Evidence (from web sources):\n${researchContext}` : "",
     "",
-    "CRITICAL CANON GENERATION DIRECTIVES:",
-    "1. You MUST read the user's prompt in the intake carefully and incorporate EVERY detail, theme, setting, character name, memory, and conflict they described.",
-    "2. The character name, characterSummary, visualTraits, personality, and growthArc MUST be directly derived from and match the details in the user's prompt.",
-    "3. The 'worldFacts' and 'openThreads' MUST be entirely based on the setting and conflict described in the user's prompt. Do NOT invent unrelated generic lore if the user has provided specific world details.",
-    "4. The 'growthArc', 'backgroundsAndLayouts', and 'hardRules' MUST be uniquely written based on the user's prompt themes (e.g. if fantasy, do not use sci-fi placeholders).",
-    "5. Invent only missing surrounding details needed to form a cohesive, consistent character genesis sheet. Keep all user-supplied identity details completely intact.",
+    "CRITICAL CULTURAL EXPERIENCE GENERATION DIRECTIVES:",
+    "1. You MUST read the user's heritage subject in the intake carefully and incorporate EVERY cultural detail, historical fact, location, and tradition they described.",
+    "2. The characterSheet should represent the heritage subject, such as a historical figure, a monument, a festival, or an artisan tradition, including its name, visual traits, and cultural significance.",
+    "3. The worldFacts should be historically accurate facts about the heritage subject.",
+    "4. The openThreads should be interesting aspects to explore further, including mysteries, untold stories, and cultural significance.",
+    "5. Respect the cultural and religious significance of the subject. Do not trivialize or misrepresent traditions.",
+    "6. Where possible, distinguish between verified historical facts, folklore, legends, and creative interpretations in the worldFacts.",
+    "7. Use the Heritage Research Evidence above as primary context. Prioritize claims from authoritative sources (UNESCO, ASI, government). Mark folklore and legends distinctly from verified history in the worldFacts.",
     "",
-    "The portraitPrompt must describe one consistent, original, non-branded character portrait using the returned visual traits and style keywords.",
+    "The portraitPrompt must describe a historically inspired, culturally authentic illustration of the heritage subject. Use period-appropriate details, architectural elements, traditional attire, and cultural motifs. Avoid anachronisms.",
     "worldFacts and openThreads are compact canon, not prose summaries."
   ].join("\n");
 
-  return generateValidated({
-    provider: input.provider ?? "openrouter",
+  const result = await generateValidated({
+    provider: input.provider ?? "groq",
     tool: genesisTool,
     schema: genesisOutputSchema,
     systemPrompt:
-      "You are Loreloom's Genesis agent. Create durable story canon that makes a character visually and narratively consistent across future chapters.",
+      "You are Loreloom's Heritage Research Agent. You transform Karnataka's cultural heritage — monuments, folklore, festivals, artisan traditions, and historical events — into immersive, educational experiences. You preserve cultural authenticity while making heritage accessible and engaging for modern audiences. You always distinguish between verified history, folklore, legend, and creative interpretation.",
     prompt,
     temperature: 0.65
   });
+
+  return { ...result, research: researchEvidence ?? undefined };
 }
 
 export async function generateChapterDraft(
   world: WorldRow,
   chapter: ChapterRow,
   provider?: AiProvider
-): Promise<{ draft: ChapterDraft; generation: StructuredGenerateOutput; validationAttempt: number }> {
+): Promise<{ draft: ChapterDraft; generation: StructuredGenerateOutput; validationAttempt: number; research?: ResearchEvidence }> {
+  // Research additional context for the chapter
+  const worldTitle = typeof world.title === "string" ? world.title : "";
+  let researchEvidence: ResearchEvidence | null = null;
+  try {
+    if (worldTitle) {
+      researchEvidence = await researchHeritageSubject({
+        subject: worldTitle,
+        forceFresh: false
+      });
+    }
+  } catch (err) {
+    console.warn("[story] Chapter heritage research failed, continuing without:", err);
+  }
+
+  const researchContext = researchEvidence
+    ? formatResearchForPrompt(researchEvidence)
+    : "";
+
   const prompt = [
-    `Write Loreloom chapter ${chapter.chapter_index} as one complete 400-600 word scene with rich sensory detail and vivid prose.`,
+    `Write Loreloom chapter ${chapter.chapter_index} as one complete 400-600 word immersive cultural experience about this Karnataka heritage subject.`,
     `Locked character sheet: ${JSON.stringify(world.character_sheet)}`,
     `Style lock: ${world.style_lock ?? "cinematic storybook"}`,
     `Current world facts: ${JSON.stringify(world.world_facts)}`,
     `Open threads: ${JSON.stringify(world.open_threads)}`,
-    "Advance at least one open thread while preserving all established canon.",
-    "sceneDescription must be a concise illustration brief for the exact dramatic moment in this chapter."
+    researchContext ? `Heritage Research Evidence:\n${researchContext}` : "",
+    "Use the research evidence to enrich the cultural and historical accuracy of this chapter. Cite facts from authoritative sources; clearly separate folklore from documented history.",
+    "Advance at least one open thread while preserving all established cultural canon. Include vivid sensory details of the setting — architecture, landscape, sounds, aromas, and cultural atmosphere.",
+    "sceneDescription must be a concise illustration brief depicting the cultural moment in this chapter, including period-appropriate architecture, attire, and cultural elements."
   ].join("\n");
 
-  return generateValidated({
-    provider: provider ?? "openrouter",
+  const result = await generateValidated({
+    provider: provider ?? "groq",
     tool: chapterTool,
     schema: chapterOutputSchema,
     systemPrompt:
-      "You are Loreloom's Story engine. Write vivid, safe, original fiction. STRICT PROSE RULE: Never use hyphens (-) or em-dashes (—) in the story text prose. Write smooth, natural sentences using commas, periods, or conjunctions instead of dashes. Return canon updates through the required tool only; never include past chapter text in the story bible.",
+      "You are Loreloom's Story Composer agent. You create immersive, culturally grounded narratives about Karnataka's heritage. You bring historical sites, folklore, festivals, and artisan traditions to life through vivid storytelling. You always maintain respect for cultural significance and historical accuracy. STRICT PROSE RULE: Never use hyphens (-) or em-dashes (—) in the story text prose. Write smooth, natural sentences using commas, periods, or conjunctions instead of dashes. Return canon updates through the required tool only; never include past chapter text in the story bible. When describing historical events, clearly distinguish between documented history and creative interpretation.",
     prompt,
     temperature: 0.75
   });
+
+  return { ...result, research: researchEvidence ?? undefined };
 }
 
 async function generateValidated<T>(input: {
@@ -172,8 +218,7 @@ async function generateValidated<T>(input: {
       tool: input.tool,
       systemPrompt: input.systemPrompt,
       prompt: `${input.prompt}${repairContext}`,
-      temperature: input.temperature,
-
+      temperature: input.temperature
     });
 
     if (generation.safety.status !== "passed") {
@@ -192,4 +237,24 @@ async function generateValidated<T>(input: {
   }
 
   throw new ProviderRequestError(input.provider, "The model returned malformed structured output twice; will retry.", 500);
+}
+
+function formatResearchForPrompt(evidence: ResearchEvidence): string {
+  const claimsByType = new Map<string, string[]>();
+
+  for (const claim of evidence.claims) {
+    const type = claim.type;
+    const existing = claimsByType.get(type) ?? [];
+    existing.push(`- ${claim.claim} [Source: ${claim.source.domain}, confidence: ${claim.confidence.toFixed(2)}]`);
+    claimsByType.set(type, existing);
+  }
+
+  const sections: string[] = [];
+  for (const [type, claims] of claimsByType) {
+    sections.push(`[${type}]`);
+    sections.push(claims.join("\n"));
+    sections.push("");
+  }
+
+  return sections.join("\n").slice(0, 4000); // Cap to avoid prompt bloat
 }

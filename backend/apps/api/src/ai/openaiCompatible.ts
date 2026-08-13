@@ -23,6 +23,9 @@ type ChatCompletionResponse = {
   }>;
   error?: {
     message?: string;
+    code?: string;
+    type?: string;
+    failed_generation?: string;
   };
 };
 
@@ -125,6 +128,19 @@ export async function callOpenAiCompatibleTool(args: {
   const data = (await response.json().catch(() => ({}))) as ChatCompletionResponse;
 
   if (!response.ok) {
+    // Groq returns a 400 with code "tool_use_failed" when the model's tool call
+    // doesn't match the schema. The partial generation is in failed_generation.
+    // Extract and parse it so our validation/retry logic can handle it.
+    if (data.error?.code === "tool_use_failed" && data.error?.failed_generation) {
+      const partialArgs = extractToolCallArguments(data.error.failed_generation);
+      if (partialArgs) {
+        return {
+          arguments: partialArgs,
+          safety: { status: "passed", finishReason: "tool_calls" }
+        };
+      }
+    }
+
     throw new ProviderRequestError(args.providerName, data.error?.message ?? response.statusText, response.status);
   }
 
@@ -165,5 +181,21 @@ export async function callOpenAiCompatibleTool(args: {
         finishReason
       }
     };
+  }
+}
+
+/**
+ * Extract JSON arguments from Groq's failed_generation format.
+ * Groq wraps the tool call as: <function=submit_genesis>{"key":"value",...}</function>
+ */
+function extractToolCallArguments(failedGeneration: string): unknown {
+  // Strip the <function=...> and </function> wrapper
+  const match = failedGeneration.match(/<function=[^>]+>([\s\S]*)<\/function>/);
+  const jsonStr = match ? match[1].trim() : failedGeneration.trim();
+
+  try {
+    return JSON.parse(jsonStr);
+  } catch {
+    return null;
   }
 }

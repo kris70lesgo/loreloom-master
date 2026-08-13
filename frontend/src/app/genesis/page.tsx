@@ -3,11 +3,10 @@
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useStory } from "../../context/StoryContext";
-import { createClient } from "@/lib/supabase/client";
+import { getLoreloomOwner, loreloomFetch } from "@/lib/api/loreloomFetch";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   User01 as User,
-  CpuChip01 as Cpu,
   Stars01 as Sparkles,
   Code01 as Code,
   Database01 as Database,
@@ -47,41 +46,41 @@ interface AiOutput {
 
 const STYLE_PRESETS = [
   {
-    id: "cyberpunk",
-    name: "Cyberpunk / Neon Noir",
-    desc: "Rain-slicked asphalt, neon violet & cyber cyan glows, high-density wireframes.",
-    accent: "#8b5cf6",
-    gradient: "linear-gradient(45deg, rgba(139,92,246,0.3), rgba(0,0,0,0.8))",
+    id: "hoysala",
+    name: "Hoysala Architecture",
+    desc: "Intricate soapstone carvings, star-shaped temple platforms, Chennakeshava sculptural detail, 12th-century Karnataka.",
+    accent: "#d4a017",
+    gradient: "linear-gradient(45deg, rgba(212,160,23,0.3), rgba(0,0,0,0.8))",
     bgImage: "/cyberpunk_aesthetic_1783952093744.png"
   },
   {
-    id: "aetherpunk",
-    name: "Aetherpunk / Sky Fantasy",
-    desc: "Floating golden-hour islands, sky captain compasses, copper and steam engines.",
-    accent: "#fbbf24",
-    gradient: "linear-gradient(45deg, rgba(251,191,36,0.3), rgba(0,0,0,0.8))",
+    id: "vijayanagara",
+    name: "Vijayanagara Empire",
+    desc: "Hampi boulder landscapes, ruined palaces, stone chariots, Tungabhadra river, 14th-century imperial grandeur.",
+    accent: "#c0392b",
+    gradient: "linear-gradient(45deg, rgba(192,57,43,0.3), rgba(0,0,0,0.8))",
     bgImage: "/aetherpunk_aesthetic_1783952104106.png"
   },
   {
-    id: "biopunk",
-    name: "Biopunk / Organic Tech",
-    desc: "Bioluminescent undergrowth, emerald synthesis, living architecture, spore trails.",
-    accent: "#10b981",
-    gradient: "linear-gradient(45deg, rgba(16,185,129,0.3), rgba(0,0,0,0.8))",
+    id: "mysore-royal",
+    name: "Mysore Royal Heritage",
+    desc: "Indo-Saracenic palace facades, Dasara processions, golden throne, royal durbar, Wodeyar dynasty opulence.",
+    accent: "#f39c12",
+    gradient: "linear-gradient(45deg, rgba(243,156,18,0.3), rgba(0,0,0,0.8))",
     bgImage: "/biopunk_aesthetic_1783952115517.png"
   },
   {
-    id: "gothic",
-    name: "Dark Gothic / Arcane",
-    desc: "Stone obsidian cathedrals, ritual circles, blood crimson flame indicators, occult sigils.",
-    accent: "#ef4444",
-    gradient: "linear-gradient(45deg, rgba(239,68,68,0.3), rgba(0,0,0,0.8))",
+    id: "western-ghats",
+    name: "Western Ghats & Nature",
+    desc: "Misty coffee plantations, evergreen forests, Jog Falls, Kodagu mist, biodiversity of the Sahyadri range.",
+    accent: "#27ae60",
+    gradient: "linear-gradient(45deg, rgba(39,174,96,0.3), rgba(0,0,0,0.8))",
     bgImage: "/gothic_aesthetic_1783952126750.png"
   },
   {
     id: "custom",
     name: "Custom / Blank Canvas",
-    desc: "A glowing white geometric blank canvas, floating polygons, awaiting your custom architectural design.",
+    desc: "Define your own visual aesthetic rooted in Karnataka's diverse cultural and natural heritage.",
     accent: "#ffffff",
     gradient: "linear-gradient(45deg, rgba(255,255,255,0.2), rgba(0,0,0,0.8))",
     bgImage: "/custom_aesthetic_1783952137526.png"
@@ -89,9 +88,10 @@ const STYLE_PRESETS = [
 ];
 
 const SPECIES_OPTIONS = [
-  { id: "human", label: "Human", icon: User, desc: "Flesh, bone, and bound by mortality." },
-  { id: "android", label: "Synthetic", icon: Cpu, desc: "Constructed intelligence, untiring and absolute." },
-  { id: "neural", label: "Neural Entity", icon: Sparkles, desc: "Pure consciousness drifting in the datastream." }
+  { id: "heritage-site", label: "Heritage Site", icon: Database, desc: "Temples, monuments, ruins, and historical landmarks of Karnataka." },
+  { id: "folklore", label: "Folklore & Legend", icon: Sparkles, desc: "Oral traditions, village stories, myths, and local legends passed down through generations." },
+  { id: "festival", label: "Festival & Tradition", icon: Palette, desc: "Celebrations, rituals, and cultural practices like Dasara, Karaga, and Ugadi." },
+  { id: "artisan", label: "Artisan & Craft", icon: User, desc: "Traditional crafts — Mysore Silk, Channapatna toys, Sandalwood carving, and folk arts like Yakshagana." }
 ];
 
 
@@ -105,26 +105,26 @@ function mapWorldToAiOutput(world: any): AiOutput {
   
   return {
     characterDetails: {
-      name: charSheet.name || intake.protagonistName || "Unnamed Protagonist",
-      skinComplexion: traits[0] || "Matte metallic silver with neon cyan micro-channels",
-      face: traits[1] || "Sharp cybernetic features, visor integration ports",
-      faceShape: traits[2] || "Chiseled, angular synthetic structure",
-      eyes: traits[3] || "Bioluminescent sapphire optical sensors",
-      height: traits[4] || "185 cm",
-      bodyType: traits[5] || "Lean, reinforced cybernetic chassis",
-      backstories: charSheet.characterSummary || intake.protagonistDesc || "No backstory generated.",
-      protagonistArchetype: personality.join(", ") || "Calm, collected, and independent",
-      woundOrMotivation: intake.relicName ? `Protect the ${intake.relicName}` : "Protect the memory core"
+      name: charSheet.name || intake.protagonistName || "Unnamed Heritage Subject",
+      skinComplexion: traits[0] || "Warm brown complexion, traditional Karnataka attire",
+      face: traits[1] || "Expressive features, traditional forehead markings",
+      faceShape: traits[2] || "Classical South Indian facial structure",
+      eyes: traits[3] || "Deep brown, reflecting heritage and wisdom",
+      height: traits[4] || "Average build",
+      bodyType: traits[5] || "Traditional attire, culturally authentic",
+      backstories: charSheet.characterSummary || intake.protagonistDesc || "No heritage narrative generated.",
+      protagonistArchetype: personality.join(", ") || "Guardian of cultural heritage",
+      woundOrMotivation: intake.relicName ? `Preserve the ${intake.relicName}` : "Preserve cultural memory for future generations"
     },
     plot: {
-      coreConflict: Array.isArray(world.open_threads) ? world.open_threads.join("; ") : "The governing AI network seeks to purge all rogue entities.",
-      slowRevealNotes: Array.isArray(world.world_facts) ? world.world_facts.join("; ") : "Dialogue reveals hints of the blackout.",
-      growthArc: charSheet.growthArc || "Starts as a cold, strictly logical unit, but gradually learns empathy and sacrifice."
+      coreConflict: Array.isArray(world.open_threads) ? world.open_threads.join("; ") : "The fading of oral traditions and cultural knowledge across generations.",
+      slowRevealNotes: Array.isArray(world.world_facts) ? world.world_facts.join("; ") : "Historical records and folklore reveal deeper cultural significance.",
+      growthArc: charSheet.growthArc || "Begins as a curious explorer and becomes a passionate custodian of Karnataka's living heritage."
     },
     cinematicVerse: {
-      animationStyle: styleKeywords.join(", ") || "High-contrast dark synthwave",
-      backgroundsAndLayouts: charSheet.backgroundsAndLayouts || "Fluid mechanical movements contrasting with organic human motions",
-      hardRules: charSheet.hardRules || "Strict character compliance rules. Magic is digital code."
+      animationStyle: styleKeywords.join(", ") || "Historically inspired, culturally authentic illustration",
+      backgroundsAndLayouts: charSheet.backgroundsAndLayouts || "Period-appropriate settings with architectural and natural elements of Karnataka",
+      hardRules: charSheet.hardRules || "Historical accuracy for documented facts. Folklore and legends are clearly distinguished from verified history."
     }
   };
 }
@@ -181,7 +181,7 @@ export default function GenesisPage() {
   const [progress, setProgress] = useState(15);
   const [isPortraitReady, setIsPortraitReady] = useState(false);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
-  
+
   const handleDragStart = (e: React.DragEvent, node: { path: string; label: string; value: string }) => {
     e.dataTransfer.setData("application/json", JSON.stringify(node));
     e.dataTransfer.effectAllowed = "copy";
@@ -193,6 +193,15 @@ export default function GenesisPage() {
   const [chatHistory, setChatHistory] = useState<{ role: "user" | "model"; content: string }[]>([]);
   const [isPromptFocused, setIsPromptFocused] = useState(false);
   const [isCommitting, setIsCommitting] = useState(false);
+
+  useEffect(() => {
+    const shouldHideShell = step === 4 && !isCommitting;
+    document.body.classList.toggle("loreloom-generating", shouldHideShell);
+
+    return () => {
+      document.body.classList.remove("loreloom-generating");
+    };
+  }, [step, isCommitting]);
 
   const toggleNodeSelection = (node: { path: string; label: string; value: string }) => {
     setSelectedNodes(prev => {
@@ -370,7 +379,7 @@ export default function GenesisPage() {
           </div>
           <div style={{...styles.treeNode, cursor: "default", background: "var(--card-bg)", border: "1px solid hsl(var(--border))"}}>
             <Dna size={14} style={{ marginTop: "2px", flexShrink: 0 }} />
-            <span style={{ lineHeight: "1.5", wordBreak: "break-word" }}><strong>Entity Base:</strong> {SPECIES_OPTIONS.find(s => s.id === genesisData.species)?.label || genesisData.species}</span>
+            <span style={{ lineHeight: "1.5", wordBreak: "break-word" }}><strong>Heritage Category:</strong> {SPECIES_OPTIONS.find(s => s.id === genesisData.species)?.label || genesisData.species}</span>
           </div>
         </div>
 
@@ -429,8 +438,8 @@ export default function GenesisPage() {
         <div style={{ marginTop: "20px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "#fff", fontSize: "0.95rem", fontWeight: 600, marginBottom: "8px" }}>
             <ChevronRight size={14} style={{ transform: "rotate(90deg)" }} />
-            <Cpu size={14} />
-            <span>2. Plot</span>
+            <Code size={14} />
+            <span>2. Narrative</span>
           </div>
           <div style={styles.treeBranch}>
             <div style={nodeStyle("plot.coreConflict")} onClick={() => toggleNodeSelection({ path: "plot.coreConflict", label: "Core Conflict", value: aiOutput.plot.coreConflict })} draggable onDragStart={(e) => handleDragStart(e, { path: "plot.coreConflict", label: "Core Conflict", value: aiOutput.plot.coreConflict })}>
@@ -489,19 +498,21 @@ export default function GenesisPage() {
     setProgress(15);
     setIsPortraitReady(false);
 
-    const supabase = createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    const activeUserId = user?.id || localStorage.getItem("loreloom_active_wallet") || "0xa33Ebc28fF3b0135ba2DaC18990DDDc162Dc2467";
-    const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
+    const { ownerId } = await getLoreloomOwner();
+    const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
     try {
-      const response = await fetch(`${API_URL}/api/worlds`, {
+      if (!ownerId) {
+        throw new Error("Could not identify the current user.");
+      }
+
+      const response = await loreloomFetch(`${API_URL}/api/worlds`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          creatorId: activeUserId,
-          walletAddress: activeUserId,
-          title: `${genesisData.style ? genesisData.style.split(' ')[0] : 'New'} Odyssey`,
+          creatorId: ownerId,
+          walletAddress: ownerId,
+          title: `${genesisData.style ? genesisData.style.split(' ')[0] : 'Karnataka'} Heritage`,
           intake: {
             prompt: genesisData.prompt,
             style: genesisData.style,
@@ -543,7 +554,7 @@ export default function GenesisPage() {
           return prev;
         });
 
-        const res = await fetch(`${API_URL}/api/worlds/${createdWorldId}`);
+        const res = await loreloomFetch(`${API_URL}/api/worlds/${createdWorldId}`);
         if (!res.ok) return;
         const data = await res.json();
         const world = data.world;
@@ -594,7 +605,7 @@ export default function GenesisPage() {
     const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
     try {
-      const response = await fetch(`${API_URL}/api/worlds/${createdWorldId}/confirm`, {
+      const response = await loreloomFetch(`${API_URL}/api/worlds/${createdWorldId}/confirm`, {
         method: "POST",
         headers: { "Content-Type": "application/json" }
       });
@@ -631,8 +642,25 @@ export default function GenesisPage() {
 
   if (!isMounted) return null;
 
+  const isGenerating = !isCommitting && step === 4;
+
   return (
-    <div style={styles.page}>
+    <div style={isGenerating ? { ...styles.page, ...styles.generatingPage } : styles.page}>
+      {isGenerating && (
+        <style>{`
+          body.loreloom-generating [data-loreloom-navbar] {
+            display: none !important;
+          }
+
+          body.loreloom-generating [data-loreloom-shell-main] {
+            padding-top: 0 !important;
+          }
+
+          body.loreloom-generating [data-loreloom-shell-footer] {
+            display: none !important;
+          }
+        `}</style>
+      )}
       {/* Spotlight Background */}
       <div 
         style={{
@@ -693,8 +721,8 @@ export default function GenesisPage() {
 
           {!isCommitting && step === 1 && (
             <motion.div key="step1" variants={variants} initial="initial" animate="animate" exit="exit" transition={springTransition} style={styles.stepCard}>
-              <h2 style={styles.title}>The Foundation</h2>
-              <p style={styles.subtitle}>Define the core entity of your narrative.</p>
+              <h2 style={styles.title}>Heritage Category</h2>
+              <p style={styles.subtitle}>Choose the type of Karnataka heritage to explore and preserve.</p>
               
               <div style={styles.cardsGrid}>
                 {SPECIES_OPTIONS.map((spec) => {
@@ -731,7 +759,7 @@ export default function GenesisPage() {
           {!isCommitting && step === 2 && (
             <motion.div key="step2" variants={variants} initial="initial" animate="animate" exit="exit" transition={springTransition} style={styles.stepCard}>
               <h2 style={styles.title}>The Aesthetic</h2>
-              <p style={styles.subtitle}>Select the generative visual anchor for your world.</p>
+              <p style={styles.subtitle}>Select the visual style rooted in Karnataka's heritage for your experience.</p>
               
               <div style={{ ...styles.cardsGrid, gridTemplateColumns: "1fr 1fr" }}>
                 {STYLE_PRESETS.map((preset) => {
@@ -780,8 +808,8 @@ export default function GenesisPage() {
 
           {!isCommitting && step === 3 && (
             <motion.div key="step3" variants={variants} initial="initial" animate="animate" exit="exit" transition={springTransition} style={styles.stepCard}>
-              <h2 style={styles.title}>The Genesis Prompt</h2>
-              <p style={styles.subtitle}>Establish the fundamental truth, conflict, or memory that sparks this universe.</p>
+              <h2 style={styles.title}>The Heritage Prompt</h2>
+              <p style={styles.subtitle}>Describe the heritage subject, historical event, folklore, or cultural tradition to bring to life.</p>
               
               <div style={{ display: "flex", justifyContent: "center", marginBottom: "40px", height: "80px", position: "relative" }}>
                 <div style={{ position: "relative", width: "80px", height: "80px", filter: "blur(15px)" }}>
@@ -837,7 +865,7 @@ export default function GenesisPage() {
                       display: "block",
                       width: "100%"
                     }}
-                    placeholder="Describe the world, the character's motivation, or a defining memory..."
+                    placeholder="Describe a heritage subject — e.g., Hampi's ruined temples, the legend of Madhuri, Yakshagana performances, or Mysore Dasara traditions..."
                     value={genesisData.prompt || ''}
                     onChange={(e) => updateData("prompt", e.target.value)}
                     onKeyDown={(e) => {
@@ -869,7 +897,7 @@ export default function GenesisPage() {
                     boxShadow: `0 0 20px ${glowColor}`
                   }}
                 >
-                  Synthesize
+                  Begin Heritage Journey
                 </button>
               </div>
             </motion.div>
@@ -921,8 +949,8 @@ export default function GenesisPage() {
             <motion.div key="step5" variants={variants} initial="initial" animate="animate" exit="exit" transition={springTransition} style={styles.confirmationCard}>
               <div style={styles.splitHeader}>
                 <div>
-                  <h2 style={styles.title}>Synthesis Complete</h2>
-                  <p style={{...styles.subtitle, color: "var(--text-secondary)", marginTop: "8px", marginBottom: 0}}>Review the structural canon before committing to the chain.</p>
+                  <h2 style={styles.title}>Heritage Experience Ready</h2>
+                  <p style={{...styles.subtitle, color: "var(--text-secondary)", marginTop: "8px", marginBottom: 0}}>Review the cultural narrative before preserving it on-chain.</p>
                 </div>
                 <button 
                   onClick={() => setViewMode(v => v === "ui" ? "json" : "ui")}
@@ -1188,7 +1216,7 @@ export default function GenesisPage() {
                     <div style={styles.promptDebug}>
                       <strong>Prompt sent to LLM:</strong>
                       <p style={{marginTop:"8px"}}>
-                        &quot;You are the Loreloom Art Director. Based on the user&apos;s choices (Species: {genesisData.species}, Style: {genesisData.style}) and their narrative input: &apos;{genesisData.prompt}&apos;, generate a structured JSON object...&quot;
+                        &quot;You are the Loreloom Heritage Composer. Based on the user&apos;s choices (Heritage Category: {genesisData.species}, Visual Style: {genesisData.style}) and their heritage input: &apos;{genesisData.prompt}&apos;, generate a structured JSON object describing the cultural experience...&quot;
                       </p>
                     </div>
                   </div>
@@ -1203,7 +1231,7 @@ export default function GenesisPage() {
                   border: "1px solid hsl(var(--border))", 
                   borderRadius: "4px"
                 }}>
-                  Edit Genesis
+                  Edit Heritage Prompt
                 </button>
                  <button 
                    onClick={confirmGenesis} 
@@ -1235,7 +1263,7 @@ export default function GenesisPage() {
                    ) : (
                      <>
                        <Database size={16} style={{marginRight: "6px", verticalAlign: "middle"}} />
-                       Confirm Genesis
+                       Confirm & Preserve
                      </>
                    )}
                  </button>
@@ -1320,6 +1348,12 @@ const styles: Record<string, React.CSSProperties> = {
     paddingTop: "24px",
     paddingBottom: "80px",
     fontFamily: "var(--font-inter)",
+  },
+  generatingPage: {
+    minHeight: "100vh",
+    justifyContent: "center",
+    paddingTop: 0,
+    paddingBottom: 0,
   },
   container: {
     width: "100%",

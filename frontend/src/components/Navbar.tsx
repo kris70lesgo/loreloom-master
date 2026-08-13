@@ -15,6 +15,7 @@ export function Navbar() {
 
   return (
     <motion.header
+      data-loreloom-navbar
       className={isLandingPage ? "dark text-white" : ""}
       style={{
         ...styles.header,

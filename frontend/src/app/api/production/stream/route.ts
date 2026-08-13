@@ -29,6 +29,7 @@ export async function GET(request: NextRequest) {
   if (!worldId) {
     return Response.json({ error: "worldId is required to save a production asset." }, { status: 400 });
   }
+  const checkedWorldId = worldId;
 
   const prompt = request.nextUrl.searchParams.get("prompt") || "A heroic space opera";
   const maxBudget = parseInt(request.nextUrl.searchParams.get("budget") ?? "") || 50;
@@ -149,18 +150,19 @@ export async function GET(request: NextRequest) {
                 finalImageUrl = "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=2564&auto=format&fit=crop";
               }
             }
+            const savedImageUrl = finalImageUrl ?? "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=2564&auto=format&fit=crop";
 
             const chapter = await saveProductionImage({
-              worldId,
+              worldId: checkedWorldId,
               prompt,
-              imageUrl: finalImageUrl
+              imageUrl: savedImageUrl
             });
             const chapterId = chapter.id;
             yield log("INFO", `Saved generated artwork to chapter ${chapter.chapter_index}.`);
 
             yield `data: ${JSON.stringify({
               type: "RESULT",
-              imageUrl: finalImageUrl,
+              imageUrl: savedImageUrl,
               dimensions: finalDimensions,
               generationTimeMs: finalGenTimeMs,
               provider: provider.name,

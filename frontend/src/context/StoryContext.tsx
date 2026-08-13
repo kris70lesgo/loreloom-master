@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { useWorldStore } from "../store/useWorldStore";
 import { createClient } from "@/lib/supabase/client";
+import { getLoreloomOwner, loreloomFetch } from "@/lib/api/loreloomFetch";
 
 export interface Chapter {
   id: string;
@@ -60,8 +61,7 @@ interface StoryContextType {
 
 const StoryContext = createContext<StoryContextType | undefined>(undefined);
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
-const WALLET_ADDRESS = process.env.NEXT_PUBLIC_WALLET_ADDRESS || "0xa33Ebc28fF3b0135ba2DaC18990DDDc162Dc2467";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
 // Backend API response shapes for type-safe mapping
 interface BackendWorldRow {
@@ -128,15 +128,14 @@ export const StoryProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const supabase = createClient();
 
     const syncUserSession = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      const currentId = user ? user.id : (localStorage.getItem("loreloom_active_wallet") || null);
-      setUserId(currentId);
+      const { ownerId } = await getLoreloomOwner();
+      setUserId(ownerId);
     };
 
     syncUserSession();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      const currentId = session?.user ? session.user.id : (localStorage.getItem("loreloom_active_wallet") || null);
+      const currentId = session?.user?.id ?? null;
       setUserId(currentId);
     });
 
@@ -148,7 +147,7 @@ export const StoryProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   // Fetch single world details helper
   const fetchWorld = useCallback(async (id: string): Promise<boolean> => {
     try {
-      const response = await fetch(`${API_URL}/api/worlds/${id}`);
+      const response = await loreloomFetch(`${API_URL}/api/worlds/${id}`);
       if (!response.ok) throw new Error("Failed to fetch world details");
       const data = await response.json();
       
@@ -181,13 +180,13 @@ export const StoryProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     const loadUserWorlds = async () => {
       try {
-        const response = await fetch(`${API_URL}/api/worlds?creatorId=${userId}`);
+        const response = await loreloomFetch(`${API_URL}/api/worlds?creatorId=${encodeURIComponent(userId)}`);
         if (response.ok) {
           const data = await response.json();
-          if (Array.isArray(data.worlds) && data.worlds.length > 0) {
+          if (Array.isArray(data.worlds)) {
             const mappedWorlds = data.worlds.map((w: any) => mapBackendWorld(w, w.chapters || []));
             setWorlds(mappedWorlds);
-            setActiveWorldId((prev) => (prev && mappedWorlds.some((mw: World) => mw.id === prev) ? prev : mappedWorlds[0].id));
+            setActiveWorldId((prev) => (prev && mappedWorlds.some((mw: World) => mw.id === prev) ? prev : (mappedWorlds[0]?.id ?? null)));
             setIsLoaded(true);
             return;
           }
@@ -303,12 +302,17 @@ export const StoryProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     protagonistDesc: string,
     relicName: string
   ): Promise<string> => {
-    const response = await fetch(`${API_URL}/api/worlds`, {
+    const { ownerId } = await getLoreloomOwner();
+    if (!ownerId) {
+      throw new Error("Could not identify the current user.");
+    }
+
+    const response = await loreloomFetch(`${API_URL}/api/worlds`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        creatorId: userId || WALLET_ADDRESS,
-        walletAddress: userId || WALLET_ADDRESS,
+        creatorId: ownerId,
+        walletAddress: ownerId,
         title: name,
         intake: {
           name,
@@ -341,7 +345,7 @@ export const StoryProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     if (!activeWorldId) return;
 
     try {
-      const response = await fetch(
+      const response = await loreloomFetch(
         `${API_URL}/api/worlds/${activeWorldId}/chapters/${chapterId}/regenerate-image`,
         {
           method: "POST",
@@ -375,7 +379,7 @@ export const StoryProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     if (!activeWorldId) return;
 
     try {
-      const response = await fetch(`${API_URL}/api/worlds/${activeWorldId}/chapters/${chapterId}`, {
+      const response = await loreloomFetch(`${API_URL}/api/worlds/${activeWorldId}/chapters/${chapterId}`, {
         method: "DELETE"
       });
       if (!response.ok) {
@@ -400,7 +404,7 @@ export const StoryProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     if (!activeWorldId) return;
 
     try {
-      const response = await fetch(`${API_URL}/api/worlds/${activeWorldId}/chapters`, {
+      const response = await loreloomFetch(`${API_URL}/api/worlds/${activeWorldId}/chapters`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ prompt, styleLock, aspectRatio })
@@ -447,23 +451,38 @@ export const StoryProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const deleteWorld = async (worldId: string) => {
+    let shouldRemoveLocally = false;
+
     try {
-      const response = await fetch(`${API_URL}/api/worlds/${worldId}`, {
-        method: "DELETE",
+      const response = await loreloomFetch(`${API_URL}/api/worlds/${worldId}`, {
+        method: "DELETE"
       });
       if (!response.ok) {
-        throw new Error("Failed to delete world on the server.");
-      }
-      setWorlds((prev) => {
-        const nextWorlds = prev.filter((w) => w.id !== worldId);
-        if (activeWorldId === worldId) {
-          setActiveWorldId(nextWorlds.length > 0 ? nextWorlds[0].id : null);
+        const err = await response.json().catch(() => ({}));
+        if (response.status === 404 || err.error === "Cannot coerce the result to a single JSON object") {
+          shouldRemoveLocally = true;
+        } else {
+          throw new Error(err.error ?? "Failed to delete world");
         }
-        return nextWorlds;
-      });
+      } else {
+        shouldRemoveLocally = true;
+      }
     } catch (err) {
-      console.error("Error deleting world:", err);
+      if (!shouldRemoveLocally) {
+        console.warn("Failed backend world deletion:", err);
+        throw err;
+      }
     }
+
+    if (!shouldRemoveLocally) return;
+
+    setWorlds((prev) => {
+      const nextWorlds = prev.filter((w) => w.id !== worldId);
+      if (activeWorldId === worldId) {
+        setActiveWorldId(nextWorlds.length > 0 ? nextWorlds[0].id : null);
+      }
+      return nextWorlds;
+    });
   };
 
   const reorderChapters = (chapterIds: string[]) => {

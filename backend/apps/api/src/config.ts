@@ -20,7 +20,7 @@ for (const envPath of envRoots.map((envPath) => envPath.replace(/\.env$/, ".env.
   }
 }
 
-export type AiProvider = "openrouter" | "nvidia";
+export type AiProvider = "openrouter" | "nvidia" | "groq";
 
 export const config = {
   port: Number(process.env.PORT ?? 4000),
@@ -51,6 +51,16 @@ export const config = {
   stability: {
     apiKey: process.env.STABILITY_API_KEY
   },
+  pollinations: {
+    apiKey: process.env.POLLINATIONS_API_KEY
+  },
+  groq: {
+    apiKey: process.env.GROQ_API_KEY,
+    model: process.env.GROQ_MODEL ?? "llama-3.3-70b-versatile"
+  },
+  tavily: {
+    apiKey: process.env.TAVILY_API_KEY
+  },
   ipfs: {
     mode: process.env.IPFS_MODE ?? "pinata",
     pinataJwt: process.env.PINATA_JWT
@@ -68,7 +78,9 @@ export const config = {
     rpcUrl: process.env.X_LAYER_RPC_URL ?? "https://testrpc.xlayer.tech/terigon",
     deployerAddress: process.env.THIRDWEB_DEPLOYER_ADDRESS,
     genesisContractAddress: process.env.GENESIS_CONTRACT_ADDRESS,
-    chapterContractAddress: process.env.CHAPTER_CONTRACT_ADDRESS
+    chapterContractAddress: process.env.CHAPTER_CONTRACT_ADDRESS,
+    mintDeployerAddress: process.env.MINT_DEPLOYER_ADDRESS,
+    mintDeployerPrivateKey: process.env.MINT_DEPLOYER_PRIVATE_KEY
   },
   procurement: {
     useLiveNetwork: process.env.USE_LIVE_NETWORK === "true",

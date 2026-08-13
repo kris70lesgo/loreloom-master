@@ -10,8 +10,9 @@ type AspectRatio = "16:9" | "1:1" | "9:16";
 
 export async function generatePortraitUrl(world: WorldRow) {
   const portraitPrompt = portraitPromptFromWorld(world);
+  const grounding = await fetchVisualKnowledge(world.title || world.style_lock || "");
   return generateImage({
-    prompt: `${portraitPrompt}\nCreate a single polished reference portrait. Preserve these locked style keywords: ${world.style_lock ?? "cinematic storybook"}.`,
+    prompt: `${portraitPrompt}\n${grounding ? `Visual grounding: ${grounding}\n` : ""}Create a single polished, historically inspired reference illustration of this Karnataka heritage subject. Include period-appropriate architectural details, traditional attire, cultural motifs, and landscape elements. Preserve these locked style keywords: ${world.style_lock ?? "cinematic storybook"}.`,
     name: `loreloom-${world.id}-portrait.png`
   });
 }
@@ -38,13 +39,13 @@ export async function generateChapterImageUrl(
   const grounding = await fetchVisualKnowledge(world.title || narrativeBeat.slice(0, 80));
 
   const prompt = [
-    `Cinematic illustration for this exact Loreloom chapter scene.`,
+    `Cinematic, historically inspired illustration depicting this Karnataka heritage chapter scene. Include culturally authentic architecture, attire, landscapes, and cultural elements appropriate to the period and region.`,
     `Style lock: ${styleLock}.`,
     grounding ? `Real-world visual anchors: ${grounding}.` : "",
     characterHint ? `Character reference: ${characterHint}.` : "",
     `Scene description: ${narrativeBeat}`.trim(),
     world.reference_image_url ? "Use the supplied reference image to preserve the protagonist's identity, visual traits, and art direction." : "",
-    `Do NOT include any text, letters, or UI overlays in the image.`
+    `Do NOT include any text, letters, or UI overlays in the image. Ensure cultural authenticity and respect in all visual representations.`
   ].filter(Boolean).join(" ");
 
   return generateImage({
@@ -73,9 +74,11 @@ async function generatePollinationsImage(input: { prompt: string; name: string; 
   const dims = aspectToDimensions(input.aspectRatio ?? "1:1");
   const cleanPrompt = encodeURIComponent(input.prompt.slice(0, 400));
   const seed = Math.floor(Math.random() * 1000000);
-  const imageUrl = `https://image.pollinations.ai/prompt/${cleanPrompt}?width=${dims.width}&height=${dims.height}&nologo=true&seed=${seed}`;
+  const token = config.pollinations.apiKey;
+  const tokenParam = token ? `&token=${token}` : "";
+  const imageUrl = `https://image.pollinations.ai/prompt/${cleanPrompt}?width=${dims.width}&height=${dims.height}&nologo=true&seed=${seed}${tokenParam}`;
 
-  const response = await fetch(imageUrl);
+  const response = await fetchWithTimeout(imageUrl, {}, 20000);
   if (!response.ok) {
     throw new Error(`Pollinations AI error: ${response.statusText}`);
   }
@@ -88,28 +91,26 @@ async function generatePollinationsImage(input: { prompt: string; name: string; 
 async function generateImage(input: { prompt: string; referenceImageUrl?: string; name: string; aspectRatio?: AspectRatio }) {
   console.log(`[images] Constructing image generation for prompt: "${input.prompt.slice(0, 100)}..."`);
 
+  // 1. Use Pollinations AI as the primary provider (free, fast, reliable with token).
+  try {
+    console.log("[images] Generating image via Pollinations AI...");
+    const url = await generatePollinationsImage(input);
+    console.log("[images] Pollinations image generation succeeded:", summarizeImageUrl(url));
+    return url;
+  } catch (err) {
+    console.warn("[images] Pollinations generation failed, falling back...", err);
+  }
 
-
-  // 2. Try Stability AI next
+  // 2. Fall back to Stability AI if Pollinations fails.
   if (config.stability.apiKey) {
     try {
       console.log("[images] Attempting image generation via Stability API...");
       const url = await generateStabilityImage(input);
-      console.log("[images] Stability image generation succeeded:", url);
+      console.log("[images] Stability image generation succeeded:", summarizeImageUrl(url));
       return url;
     } catch (err) {
       console.warn("[images] Stability generation failed, falling back...", err);
     }
-  }
-
-  // 3. Try Pollinations AI FLUX Engine (Free, instant, unlimited AI image generation matching exact prompt!)
-  try {
-    console.log("[images] Generating relevant AI artwork via Pollinations FLUX engine...");
-    const url = await generatePollinationsImage(input);
-    console.log("[images] Pollinations FLUX image generation succeeded:", url);
-    return url;
-  } catch (err) {
-    console.warn("[images] Pollinations generation failed, falling back...", err);
   }
 
   console.warn("[images] All AI image providers failed. Falling back to placeholder image...");
@@ -146,6 +147,16 @@ async function generateStabilityImage(input: { prompt: string; name: string; asp
 
   const buffer = await response.arrayBuffer();
   return pinImage({ bytes: Buffer.from(buffer), mimeType: "image/jpeg", name: input.name });
+}
+
+async function fetchWithTimeout(input: string | URL, init: RequestInit = {}, timeoutMs = 20000) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }
 
 async function generateNvidiaImage(input: { prompt: string; name: string; aspectRatio?: AspectRatio }) {
@@ -198,12 +209,16 @@ async function generateNvidiaImage(input: { prompt: string; name: string; aspect
 
 function placeholderImage(prompt: string) {
   const defaultPortraits = [
-    "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=600&auto=format&fit=crop",
-    "https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?q=80&w=600&auto=format&fit=crop",
-    "https://images.unsplash.com/photo-1614850523459-c2f4c699c52e?q=80&w=600&auto=format&fit=crop"
+    "https://images.unsplash.com/photo-1582510003574-7d4aa2807e19?q=80&w=600&auto=format&fit=crop",
+    "https://images.unsplash.com/photo-1564507592333-c60657eea523?q=80&w=600&auto=format&fit=crop",
+    "https://images.unsplash.com/photo-1602217245824-4a8e6f6e9e91?q=80&w=600&auto=format&fit=crop"
   ];
   const index = Math.abs(prompt.length) % defaultPortraits.length;
   return defaultPortraits[index];
+}
+
+function summarizeImageUrl(url: string) {
+  return url.startsWith("data:") ? `${url.slice(0, 32)}... (${url.length} chars)` : url;
 }
 
 async function fetchReferenceImage(imageUrl: string) {

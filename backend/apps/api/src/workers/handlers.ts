@@ -231,7 +231,7 @@ async function processChapterImageJob(job: GenerationJobRow) {
     }
 
     await updateJobCheckpoint(job.id, {
-      image: { provider: "openrouter", model: "configured", safety: { status: "passed" } }
+      image: { provider: "pollinations", model: "configured", safety: { status: "passed" } }
     });
   }
 
@@ -297,17 +297,13 @@ async function processChapterMintJob(job: GenerationJobRow) {
 function providerFromJob(job: GenerationJobRow) {
   if (typeof job.payload === "object" && job.payload !== null && !Array.isArray(job.payload)) {
     const provider = job.payload.provider;
-    if (provider === "openrouter" || provider === "nvidia") {
-      return provider as "openrouter" | "nvidia";
+    if (provider === "openrouter" || provider === "nvidia" || provider === "groq") {
+      return provider;
     }
   }
 
-  // If NVIDIA is configured, prefer it over OpenRouter since OpenRouter free tier is heavily rate-limited (429)
-  if (config.nvidia.apiKey) {
-    return "nvidia" as const;
-  }
-
-  return "openrouter" as const;
+  // Default to Groq — fast, reliable, generous free tier.
+  return "groq" as const;
 }
 
 function generationCheckpoint(

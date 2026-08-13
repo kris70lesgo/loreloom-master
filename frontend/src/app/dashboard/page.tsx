@@ -317,9 +317,13 @@ export default function DashboardPage() {
                   Cancel
                 </button>
                 <button 
-                  onClick={() => {
-                    deleteWorld(projectToDelete);
-                    setProjectToDelete(null);
+                  onClick={async () => {
+                    try {
+                      await deleteWorld(projectToDelete);
+                      setProjectToDelete(null);
+                    } catch (err) {
+                      console.warn("Failed to delete project:", err);
+                    }
                   }}
                   style={{
                     background: "rgba(239, 68, 68, 0.15)",

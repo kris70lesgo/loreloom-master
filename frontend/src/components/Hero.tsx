@@ -93,9 +93,9 @@ export function Hero() {
 
           {/* Center: absolutely centered group (hidden on mobile) */}
           <div className="absolute left-1/2 -translate-x-1/2 hidden md:flex items-center gap-8">
-            <NavButton>Discover</NavButton>
-            <NavButton>Pricing</NavButton>
-            <NavButton>FAQs</NavButton>
+            <Link href="/login"><NavButton>Discover</NavButton></Link>
+            <Link href="/login"><NavButton>Pricing</NavButton></Link>
+            <Link href="/login"><NavButton>FAQs</NavButton></Link>
           </div>
 
           {/* Right: Auth Links & Sign Up / Logout Button */}
@@ -171,13 +171,15 @@ export function Hero() {
             />
 
             {/* Upload Button */}
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              aria-label="Upload inspiration"
-              className="absolute left-[21px] top-[137px] w-11 h-11 bg-transparent border border-white/70 rounded-full cursor-pointer flex items-center justify-center backdrop-blur-[14px] transition-transform hover:scale-105 focus-visible:outline-2 focus-visible:outline-white focus-visible:outline-offset-2"
-            >
-              <Upload className="w-[18px] h-[18px] text-wandor-text flex-shrink-0" />
-            </button>
+            <Link href="/login">
+              <button
+                type="button"
+                aria-label="Upload inspiration"
+                className="absolute left-[21px] top-[137px] w-11 h-11 bg-transparent border border-white/70 rounded-full cursor-pointer flex items-center justify-center backdrop-blur-[14px] transition-transform hover:scale-105 focus-visible:outline-2 focus-visible:outline-white focus-visible:outline-offset-2"
+              >
+                <Upload className="w-[18px] h-[18px] text-wandor-text flex-shrink-0" />
+              </button>
+            </Link>
 
             {/* Start Creating Button inside card */}
             <Link href={user ? "/genesis" : "/login?redirect=/genesis"} className="absolute bottom-[21px] right-[21px] inline-flex items-center">

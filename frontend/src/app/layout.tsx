@@ -22,8 +22,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Loreloom | AI Art Director for Visual Stories",
-  description: "Create ongoing visual stories with persistent narrative memory, custom visual styles, and on-chain provenance registry.",
+  title: "Loreloom | AI-Powered Living Archive of Karnataka",
+  description: "Explore heritage, folklore, monuments, traditions and forgotten stories of Karnataka through immersive AI-powered storytelling with on-chain cultural provenance.",
   icons: {
     icon: [
       { url: "/favicon.svg", type: "image/svg+xml" },
@@ -41,6 +41,32 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable} ${inter.variable}`} suppressHydrationWarning={true} data-scroll-behavior="smooth">
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                // Suppress benign errors from browser extensions (MetaMask, etc.)
+                var originalError = window.onerror;
+                window.onerror = function(msg, url, line, col, err) {
+                  if (url && (url.indexOf('chrome-extension://') !== -1 || url.indexOf('moz-extension://') !== -1)) {
+                    return true;
+                  }
+                  if (typeof msg === 'string' && (msg.indexOf('MetaMask') !== -1 || msg.indexOf('metamask') !== -1)) {
+                    return true;
+                  }
+                  return originalError ? originalError.apply(this, arguments) : false;
+                };
+                window.addEventListener('unhandledrejection', function(e) {
+                  if (e.reason && typeof e.reason === 'object' && e.reason.message && e.reason.message.indexOf('MetaMask') !== -1) {
+                    e.preventDefault();
+                  }
+                });
+              })();
+            `
+          }}
+        />
+      </head>
       <body style={{ margin: 0, display: "flex", flexDirection: "column", minHeight: "100vh" }}>
         <ThemeProvider
             attribute="class"

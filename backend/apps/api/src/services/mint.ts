@@ -4,6 +4,7 @@ import { config } from "../config.js";
 import { getSupabaseAdmin } from "../db/supabase.js";
 import type { ChapterRow, MintTransactionRow, WorldRow } from "../db/types.js";
 import { getEngineTransaction, submitContractWrite } from "./thirdwebEngine.js";
+import { directMintGenesis, directMintChapter } from "./directMint.js";
 
 type MintResult = {
   tokenId: string;
@@ -13,6 +14,9 @@ type MintResult = {
 };
 
 export async function mintGenesis(world: WorldRow, metadataUri: string): Promise<MintResult> {
+  if (config.mint.mode === "direct") {
+    return directMintGenesis(world, metadataUri);
+  }
   return ensureMintTransaction({
     idempotencyKey: `genesis-${world.id}`,
     txType: "genesis",
@@ -26,6 +30,9 @@ export async function mintGenesis(world: WorldRow, metadataUri: string): Promise
 export async function mintChapter(world: WorldRow, chapter: ChapterRow, metadataUri: string): Promise<MintResult> {
   if (!world.genesis_token_id) {
     throw new Error("Cannot mint a chapter before its Genesis token is confirmed.");
+  }
+  if (config.mint.mode === "direct") {
+    return directMintChapter(world, chapter, metadataUri);
   }
   return ensureMintTransaction({
     idempotencyKey: `chapter-${world.id}-${chapter.chapter_index}`,
@@ -60,7 +67,7 @@ async function ensureMintTransaction(input: {
     return recordMockMint(input);
   }
   if (config.mint.mode !== "thirdweb-engine" && config.mint.mode !== "thirdweb-transactions") {
-    throw new Error(`Unsupported MINT_MODE=${config.mint.mode}. Use mock, thirdweb-engine, or thirdweb-transactions.`);
+    throw new Error(`Unsupported MINT_MODE=${config.mint.mode}. Use mock, direct, thirdweb-engine, or thirdweb-transactions.`);
   }
 
   const existingQueueId = existing?.tx_hash?.startsWith("engine:") ? existing.tx_hash.slice("engine:".length) : undefined;

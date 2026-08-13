@@ -5,7 +5,7 @@ import { generateText, getProviderStatuses, isAiProvider } from "../ai/providers
 import { asyncRoute } from "../http/asyncRoute.js";
 
 const generateSchema = z.object({
-  provider: z.string().refine(isAiProvider, "Provider must be openrouter, gemini, or nvidia."),
+  provider: z.string().refine(isAiProvider, "Provider must be openrouter, nvidia, or groq."),
   prompt: z.string().min(1, "Prompt is required."),
   systemPrompt: z.string().optional(),
   temperature: z.number().min(0).max(2).optional()

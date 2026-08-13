@@ -30,14 +30,11 @@ export async function pinJson(metadata: JsonValue) {
 
 export async function pinImage(input: { bytes: Uint8Array; mimeType: string; name: string }) {
   if (config.ipfs.mode === "mock") {
-    const base64 = Buffer.from(input.bytes).toString("base64");
-    return `data:${input.mimeType};base64,${base64}`;
+    return imageDataUri(input);
   }
 
   if (config.ipfs.mode !== "pinata" || !config.ipfs.pinataJwt) {
-    // Fall back to instant data URI if Pinata is not set up
-    const base64 = Buffer.from(input.bytes).toString("base64");
-    return `data:${input.mimeType};base64,${base64}`;
+    return imageDataUri(input);
   }
 
   const form = new FormData();
@@ -55,8 +52,22 @@ export async function pinImage(input: { bytes: Uint8Array; mimeType: string; nam
   const data = (await response.json().catch(() => ({}))) as { IpfsHash?: string; error?: string };
 
   if (!response.ok || !data.IpfsHash) {
-    throw new Error(data.error ?? "Pinata could not store the generated image.");
+    console.warn("[ipfs] Pinata image upload failed; using data URI fallback.", {
+      status: response.status,
+      error: formatPinataError(data.error)
+    });
+    return imageDataUri(input);
   }
 
   return `ipfs://${data.IpfsHash}`;
+}
+
+function imageDataUri(input: { bytes: Uint8Array; mimeType: string }) {
+  const base64 = Buffer.from(input.bytes).toString("base64");
+  return `data:${input.mimeType};base64,${base64}`;
+}
+
+function formatPinataError(error: unknown) {
+  if (!error) return "Pinata could not store the generated image.";
+  return typeof error === "string" ? error : JSON.stringify(error);
 }

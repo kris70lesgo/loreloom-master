@@ -1,7 +1,8 @@
-import { Router } from "express";
+import { Router, type Request } from "express";
 import { z } from "zod";
 import { generateProductionPlans } from "../services/director.js";
 import { getSupabaseAdmin } from "../db/supabase.js";
+import { HttpError } from "../http/errors.js";
 import { asyncRoute } from "../http/asyncRoute.js";
 import { stringParam } from "../http/params.js";
 import {
@@ -28,20 +29,45 @@ const createWorldSchema = z.object({
   title: z.string().trim().min(1).optional(),
   intake: intakeSchema.optional(),
   styleLock: z.string().trim().min(1).optional(),
-  aiProvider: z.enum(["openrouter", "nvidia"]).optional()
+  aiProvider: z.enum(["openrouter", "nvidia", "groq"]).optional()
 });
 
 export const worldsRouter = Router();
 
+async function getRequestOwnerId(req: Request) {
+  const authorization = req.header("authorization");
+  const token = authorization?.match(/^Bearer\s+(.+)$/i)?.[1];
+
+  if (token) {
+    const { data, error } = await getSupabaseAdmin().auth.getUser(token);
+    if (error || !data.user) {
+      throw new HttpError(401, "Invalid Supabase session.");
+    }
+    return data.user.id;
+  }
+
+  const headerOwner = req.header("x-loreloom-owner-id");
+  const fallbackOwner =
+    headerOwner ||
+    (typeof req.query.creatorId === "string" ? req.query.creatorId : undefined) ||
+    (typeof req.query.userId === "string" ? req.query.userId : undefined) ||
+    (typeof req.query.walletAddress === "string" ? req.query.walletAddress : undefined) ||
+    req.body?.creatorId ||
+    req.body?.userId ||
+    req.body?.walletAddress;
+
+  if (!fallbackOwner || typeof fallbackOwner !== "string") {
+    throw new HttpError(401, "User identity is required.");
+  }
+
+  return fallbackOwner;
+}
+
 worldsRouter.get(
   "/",
   asyncRoute(async (req, res) => {
-    const creatorId = (req.query.creatorId || req.query.walletAddress || req.query.userId) as string | undefined;
-    if (!creatorId) {
-      res.json({ worlds: [] });
-      return;
-    }
-    const result = await listUserWorlds(creatorId);
+    const ownerId = await getRequestOwnerId(req);
+    const result = await listUserWorlds(ownerId);
     res.json(result);
   })
 );
@@ -56,7 +82,8 @@ worldsRouter.post(
       return;
     }
 
-    const userIdentifier = parsed.data.creatorId || parsed.data.userId || parsed.data.walletAddress;
+    const requestOwnerId = await getRequestOwnerId(req);
+    const userIdentifier = requestOwnerId || parsed.data.creatorId || parsed.data.userId || parsed.data.walletAddress;
     if (!userIdentifier) {
       res.status(400).json({ error: "creatorId or walletAddress is required." });
       return;
@@ -70,7 +97,8 @@ worldsRouter.post(
 worldsRouter.get(
   "/:worldId",
   asyncRoute(async (req, res) => {
-    const result = await getWorldDetails(stringParam(req.params.worldId, "worldId"));
+    const ownerId = await getRequestOwnerId(req);
+    const result = await getWorldDetails(stringParam(req.params.worldId, "worldId"), ownerId);
     res.json(result);
   })
 );
@@ -78,7 +106,19 @@ worldsRouter.get(
 worldsRouter.get(
   "/:worldId/canon",
   asyncRoute(async (req, res) => {
-    const result = await getCanon(stringParam(req.params.worldId, "worldId"));
+    const ownerId = await getRequestOwnerId(req);
+    const result = await getCanon(stringParam(req.params.worldId, "worldId"), ownerId);
+    res.json(result);
+  })
+);
+
+worldsRouter.delete(
+  "/:worldId",
+  asyncRoute(async (req, res) => {
+    const result = await deleteWorld(
+      stringParam(req.params.worldId, "worldId"),
+      await getRequestOwnerId(req)
+    );
     res.json(result);
   })
 );
@@ -86,7 +126,8 @@ worldsRouter.get(
 worldsRouter.post(
   "/:worldId/genesis/retry",
   asyncRoute(async (req, res) => {
-    const result = await retryGenesisGeneration(stringParam(req.params.worldId, "worldId"));
+    const ownerId = await getRequestOwnerId(req);
+    const result = await retryGenesisGeneration(stringParam(req.params.worldId, "worldId"), ownerId);
     res.status(202).json(result);
   })
 );
@@ -94,7 +135,8 @@ worldsRouter.post(
 worldsRouter.post(
   "/:worldId/portrait/regenerate",
   asyncRoute(async (req, res) => {
-    const result = await regeneratePortrait(stringParam(req.params.worldId, "worldId"));
+    const ownerId = await getRequestOwnerId(req);
+    const result = await regeneratePortrait(stringParam(req.params.worldId, "worldId"), ownerId);
     res.status(202).json(result);
   })
 );
@@ -102,7 +144,8 @@ worldsRouter.post(
 worldsRouter.post(
   "/:worldId/portrait/retry",
   asyncRoute(async (req, res) => {
-    const result = await regeneratePortrait(stringParam(req.params.worldId, "worldId"));
+    const ownerId = await getRequestOwnerId(req);
+    const result = await regeneratePortrait(stringParam(req.params.worldId, "worldId"), ownerId);
     res.status(202).json({ ...result, message: "Let's try that portrait differently before it becomes permanent." });
   })
 );
@@ -110,7 +153,8 @@ worldsRouter.post(
 worldsRouter.post(
   "/:worldId/confirm",
   asyncRoute(async (req, res) => {
-    const result = await confirmWorld(stringParam(req.params.worldId, "worldId"));
+    const ownerId = await getRequestOwnerId(req);
+    const result = await confirmWorld(stringParam(req.params.worldId, "worldId"), ownerId);
     res.status(202).json(result);
   })
 );
@@ -118,7 +162,8 @@ worldsRouter.post(
 worldsRouter.post(
   "/:worldId/chapters",
   asyncRoute(async (req, res) => {
-    const result = await createNextChapter(stringParam(req.params.worldId, "worldId"));
+    const ownerId = await getRequestOwnerId(req);
+    const result = await createNextChapter(stringParam(req.params.worldId, "worldId"), ownerId);
     res.status(202).json(result);
   })
 );
@@ -134,9 +179,11 @@ worldsRouter.post(
   asyncRoute(async (req, res) => {
     const parsed = regenerateImageSchema.safeParse(req.body);
     const options = parsed.success ? parsed.data : {};
+    const ownerId = await getRequestOwnerId(req);
     const result = await regenerateChapterImage(
       stringParam(req.params.worldId, "worldId"),
       stringParam(req.params.chapterId, "chapterId"),
+      ownerId,
       options
     );
     res.status(202).json(result);
@@ -148,7 +195,8 @@ worldsRouter.post(
   asyncRoute(async (req, res) => {
     const result = await retryChapterGeneration(
       stringParam(req.params.worldId, "worldId"),
-      stringParam(req.params.chapterId, "chapterId")
+      stringParam(req.params.chapterId, "chapterId"),
+      await getRequestOwnerId(req)
     );
     res.status(202).json(result);
   })
@@ -159,7 +207,8 @@ worldsRouter.delete(
   asyncRoute(async (req, res) => {
     const result = await deleteChapter(
       stringParam(req.params.worldId, "worldId"),
-      stringParam(req.params.chapterId, "chapterId")
+      stringParam(req.params.chapterId, "chapterId"),
+      await getRequestOwnerId(req)
     );
     res.json(result);
   })
@@ -178,6 +227,7 @@ worldsRouter.patch(
       stringParam(req.params.worldId, "worldId"),
       stringParam(req.params.chapterId, "chapterId"),
       parsed.content,
+      await getRequestOwnerId(req),
       parsed.sceneDescription
     );
     res.json(result);
@@ -215,13 +265,5 @@ worldsRouter.get(
     const supabase = getSupabaseAdmin();
     const { data: procurements } = await supabase.from("procurements").select("id, world_id, chapter_id, provider_id, task_type, status, cost_hbar, payment_receipt, hashscan_url, asset_url, created_at, updated_at, provider_registry(name, category)").eq("world_id", req.params.worldId);
     res.json({ procurements });
-  })
-);
-
-worldsRouter.delete(
-  "/:worldId",
-  asyncRoute(async (req, res) => {
-    const result = await deleteWorld(stringParam(req.params.worldId, "worldId"));
-    res.json(result);
   })
 );

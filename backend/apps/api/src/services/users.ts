@@ -14,6 +14,32 @@ export function normalizeWalletAddress(walletAddress: string) {
   return walletSchema.parse(trimmed).toLowerCase();
 }
 
+export async function resolveUserId(identifier: string): Promise<string | null> {
+  const supabase = getSupabaseAdmin();
+  const trimmed = identifier.trim();
+
+  if (uuidRegex.test(trimmed)) {
+    const { data, error } = await supabase.from("users").select("id").eq("id", trimmed).maybeSingle();
+    if (error) {
+      throw new HttpError(500, error.message);
+    }
+    return data?.id ?? null;
+  }
+
+  const normalized = walletSchema.safeParse(trimmed).success ? trimmed.toLowerCase() : trimmed;
+  const { data, error } = await supabase
+    .from("users")
+    .select("id")
+    .eq("wallet_address", normalized)
+    .maybeSingle();
+
+  if (error) {
+    throw new HttpError(500, error.message);
+  }
+
+  return data?.id ?? null;
+}
+
 export async function getOrCreateUser(identifier: string): Promise<UserRow> {
   const supabase = getSupabaseAdmin();
   const trimmed = identifier.trim();

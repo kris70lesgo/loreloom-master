@@ -4,7 +4,7 @@ import { getSupabaseAdmin } from "../db/supabase.js";
 import type { ChapterRow, JsonValue, WorldRow } from "../db/types.js";
 import { HttpError, isUniqueViolation } from "../http/errors.js";
 import { enqueueJob, enqueueJobIfMissing } from "./jobs.js";
-import { getOrCreateUser } from "./users.js";
+import { getOrCreateUser, resolveUserId } from "./users.js";
 
 export const intakeSchema = z.record(z.unknown()).default({});
 
@@ -45,7 +45,7 @@ export async function createWorld(input: {
   return { user, world: world as WorldRow, job };
 }
 
-export async function regeneratePortrait(worldId: string) {
+export async function regeneratePortrait(worldId: string, ownerIdentifier?: string) {
   const supabase = getSupabaseAdmin();
   const { count, error: countError } = await supabase
     .from("generation_jobs")
@@ -62,6 +62,9 @@ export async function regeneratePortrait(worldId: string) {
   }
 
   const world = await getWorldRow(worldId);
+  if (ownerIdentifier) {
+    await assertWorldOwner(world, ownerIdentifier);
+  }
   const job = await enqueueJob({
     jobType: "portrait.generate",
     worldId: world.id,
@@ -71,9 +74,19 @@ export async function regeneratePortrait(worldId: string) {
   return { world, job };
 }
 
-export async function retryGenesisGeneration(worldId: string) {
+async function assertWorldOwner(world: WorldRow, ownerIdentifier: string) {
+  const ownerId = await resolveUserId(ownerIdentifier);
+  if (!ownerId || world.creator_id !== ownerId) {
+    throw new HttpError(404, "World not found.");
+  }
+}
+
+export async function retryGenesisGeneration(worldId: string, ownerIdentifier?: string) {
   const supabase = getSupabaseAdmin();
   const world = await getWorldRow(worldId);
+  if (ownerIdentifier) {
+    await assertWorldOwner(world, ownerIdentifier);
+  }
 
   if (world.reference_image_url || world.genesis_token_id) {
     throw new HttpError(409, "Genesis canon is already established for this world.");
@@ -92,9 +105,12 @@ export async function retryGenesisGeneration(worldId: string) {
   return { world: await getWorldRow(world.id), job, message: "Let's refine that character world before it becomes permanent." };
 }
 
-export async function confirmWorld(worldId: string) {
+export async function confirmWorld(worldId: string, ownerIdentifier?: string) {
   const supabase = getSupabaseAdmin();
   const world = await getWorldRow(worldId);
+  if (ownerIdentifier) {
+    await assertWorldOwner(world, ownerIdentifier);
+  }
 
   if (world.status !== "portrait_ready" || !world.reference_image_url) {
     if (world.reference_image_url) {
@@ -148,9 +164,12 @@ export async function confirmWorld(worldId: string) {
   return { world: await getWorldRow(world.id), job };
 }
 
-export async function createNextChapter(worldId: string) {
+export async function createNextChapter(worldId: string, ownerIdentifier?: string) {
   const supabase = getSupabaseAdmin();
   const world = await getWorldRow(worldId);
+  if (ownerIdentifier) {
+    await assertWorldOwner(world, ownerIdentifier);
+  }
 
   const { data: latest, error: latestError } = await supabase
     .from("chapters")
@@ -247,10 +266,14 @@ export async function saveProductionImage(input: {
 export async function regenerateChapterImage(
   worldId: string,
   chapterId: string,
+  ownerIdentifier?: string,
   options?: { narrativeContext?: string; styleLock?: string; aspectRatio?: string }
 ) {
   const supabase = getSupabaseAdmin();
   const world = await getWorldRow(worldId);
+  if (ownerIdentifier) {
+    await assertWorldOwner(world, ownerIdentifier);
+  }
   const chapter = await getChapterRow(chapterId);
 
   if (chapter.world_id !== world.id) {
@@ -281,9 +304,12 @@ export async function regenerateChapterImage(
   return { world, chapter: await getChapterRow(chapter.id), job };
 }
 
-export async function retryChapterGeneration(worldId: string, chapterId: string) {
+export async function retryChapterGeneration(worldId: string, chapterId: string, ownerIdentifier?: string) {
   const supabase = getSupabaseAdmin();
   const world = await getWorldRow(worldId);
+  if (ownerIdentifier) {
+    await assertWorldOwner(world, ownerIdentifier);
+  }
   const chapter = await getChapterRow(chapterId);
 
   if (chapter.world_id !== world.id) {
@@ -304,9 +330,12 @@ export async function retryChapterGeneration(worldId: string, chapterId: string)
   return { world, chapter: await getChapterRow(chapter.id), job, message: "Let's try that scene differently before it becomes permanent." };
 }
 
-export async function getWorldDetails(worldId: string) {
+export async function getWorldDetails(worldId: string, ownerIdentifier?: string) {
   const supabase = getSupabaseAdmin();
   const world = await getWorldRow(worldId);
+  if (ownerIdentifier) {
+    await assertWorldOwner(world, ownerIdentifier);
+  }
   const { data: chapters, error: chapterError } = await supabase
     .from("chapters")
     .select("*")
@@ -323,9 +352,9 @@ export async function getWorldDetails(worldId: string) {
   };
 }
 
-export async function getCanon(worldId: string) {
+export async function getCanon(worldId: string, ownerIdentifier?: string) {
   const supabase = getSupabaseAdmin();
-  const { world, chapters } = await getWorldDetails(worldId);
+  const { world, chapters } = await getWorldDetails(worldId, ownerIdentifier);
   const { data: mints, error: mintError } = await supabase
     .from("mint_transactions")
     .select("*")
@@ -343,9 +372,12 @@ export async function getCanon(worldId: string) {
   };
 }
 
-export async function deleteChapter(worldId: string, chapterId: string) {
+export async function deleteChapter(worldId: string, chapterId: string, ownerIdentifier?: string) {
   const supabase = getSupabaseAdmin();
   const world = await getWorldRow(worldId);
+  if (ownerIdentifier) {
+    await assertWorldOwner(world, ownerIdentifier);
+  }
 
   // Check if chapter exists and is not minted before deleting
   const { data: chapter, error: fetchError } = await supabase
@@ -379,14 +411,39 @@ export async function deleteChapter(worldId: string, chapterId: string) {
   return { world: await getWorldRow(world.id) };
 }
 
+export async function deleteWorld(worldId: string, ownerIdentifier: string) {
+  const supabase = getSupabaseAdmin();
+  const world = await getWorldRow(worldId);
+  await assertWorldOwner(world, ownerIdentifier);
+
+  if (world.genesis_token_id) {
+    throw new HttpError(409, "A minted world cannot be deleted.");
+  }
+
+  await supabase.from("generation_jobs").delete().eq("world_id", world.id);
+  await supabase.from("procurements").delete().eq("world_id", world.id);
+  await supabase.from("chapters").delete().eq("world_id", world.id);
+
+  const { error } = await supabase.from("worlds").delete().eq("id", world.id);
+  if (error) {
+    throw new HttpError(500, error.message);
+  }
+
+  return { deletedWorldId: world.id };
+}
+
 export async function updateChapterContent(
   worldId: string,
   chapterId: string,
   content: string,
+  ownerIdentifier?: string,
   sceneDescription?: string
 ) {
   const supabase = getSupabaseAdmin();
   const world = await getWorldRow(worldId);
+  if (ownerIdentifier) {
+    await assertWorldOwner(world, ownerIdentifier);
+  }
   const chapter = await getChapterRow(chapterId);
 
   if (chapter.world_id !== world.id) {
@@ -408,7 +465,7 @@ export async function updateChapterContent(
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        provider: "gemini",
+        provider: "groq",
         prompt: `You are a story engine analyzer. Look at this updated chapter text:\n"""\n${content}\n"""\n\nIdentify the protagonist's name. Return ONLY the name (1-2 words), nothing else. If you cannot identify the name, return "NONE".`,
         systemPrompt: "Return only the protagonist's name, nothing else."
       })
@@ -472,21 +529,9 @@ export async function getChapterRow(chapterId: string): Promise<ChapterRow> {
 
 export async function listUserWorlds(creatorIdOrWallet: string) {
   const supabase = getSupabaseAdmin();
-  
-  let userId = creatorIdOrWallet;
-  if (creatorIdOrWallet.startsWith("0x")) {
-    const { data: user } = await supabase
-      .from("users")
-      .select("id")
-      .eq("wallet_address", creatorIdOrWallet.toLowerCase())
-      .maybeSingle();
-    if (user) {
-      userId = user.id;
-    }
-  }
 
-  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId);
-  if (!isUuid) {
+  const userId = await resolveUserId(creatorIdOrWallet);
+  if (!userId) {
     return { worlds: [] };
   }
 
@@ -501,36 +546,4 @@ export async function listUserWorlds(creatorIdOrWallet: string) {
   }
 
   return { worlds: worlds || [] };
-}
-
-export async function deleteWorld(worldId: string) {
-  const supabase = getSupabaseAdmin();
-  
-  // Verify world exists
-  const { data: world, error: fetchError } = await supabase
-    .from("worlds")
-    .select("id")
-    .eq("id", worldId)
-    .single();
-
-  if (fetchError || !world) {
-    throw new HttpError(404, "World not found.");
-  }
-
-  // Explicitly delete related records to prevent FK constraints issues if CASCADE is missing
-  await supabase.from("generation_jobs").delete().eq("world_id", worldId);
-  await supabase.from("procurements").delete().eq("world_id", worldId);
-  await supabase.from("chapters").delete().eq("world_id", worldId);
-
-  // Delete the world.
-  const { error: deleteError } = await supabase
-    .from("worlds")
-    .delete()
-    .eq("id", worldId);
-
-  if (deleteError) {
-    throw new HttpError(500, deleteError.message);
-  }
-
-  return { success: true };
 }
