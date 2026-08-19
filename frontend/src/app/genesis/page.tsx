@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useStory } from "../../context/StoryContext";
-import { getLoreloomOwner, loreloomFetch } from "@/lib/api/loreloomFetch";
+import { getLoreloomOwner, loreloomApiPath, loreloomFetch } from "@/lib/api/loreloomFetch";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   User01 as User,
@@ -224,8 +224,6 @@ export default function GenesisPage() {
     const targetLabel = selectedNodes.length > 0 ? selectedNodes.map(n => n.label).join(", ") : "General";
     setChatHistory(prev => [...prev, { role: "user", content: `Refine [${targetLabel}]: ${instruction}` }]);
     
-    const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
-
     try {
       const prompt = [
         `You are the Loreloom Story Engine.`,
@@ -244,7 +242,7 @@ export default function GenesisPage() {
         `You MUST return ONLY the updated JSON object. Do NOT wrap it in markdown code blocks, do NOT include backticks (e.g. \`\`\`json), and do NOT add any conversational prefix or suffix. Return a single raw JSON object that matches the input structure exactly.`
       ].join("\n");
 
-      const response = await fetch(`${API_URL}/api/ai/generate`, {
+      const response = await fetch(loreloomApiPath("/api/ai/generate"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -499,14 +497,12 @@ export default function GenesisPage() {
     setIsPortraitReady(false);
 
     const { ownerId } = await getLoreloomOwner();
-    const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
-
     try {
       if (!ownerId) {
         throw new Error("Could not identify the current user.");
       }
 
-      const response = await loreloomFetch(`${API_URL}/api/worlds`, {
+      const response = await loreloomFetch(loreloomApiPath("/api/worlds"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -541,8 +537,6 @@ export default function GenesisPage() {
 
     let isMounted = true;
     let attempts = 0;
-    const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
-
     const poll = async () => {
       try {
         attempts += 1;
@@ -554,7 +548,7 @@ export default function GenesisPage() {
           return prev;
         });
 
-        const res = await loreloomFetch(`${API_URL}/api/worlds/${createdWorldId}`);
+        const res = await loreloomFetch(loreloomApiPath(`/api/worlds/${createdWorldId}`));
         if (!res.ok) return;
         const data = await res.json();
         const world = data.world;
@@ -602,10 +596,8 @@ export default function GenesisPage() {
     setIsCommitting(true);
     setError(null);
 
-    const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
-
     try {
-      const response = await loreloomFetch(`${API_URL}/api/worlds/${createdWorldId}/confirm`, {
+      const response = await loreloomFetch(loreloomApiPath(`/api/worlds/${createdWorldId}/confirm`), {
         method: "POST",
         headers: { "Content-Type": "application/json" }
       });

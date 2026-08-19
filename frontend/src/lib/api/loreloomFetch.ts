@@ -52,3 +52,26 @@ export async function loreloomFetch(input: string, init: RequestInit = {}) {
     headers
   });
 }
+
+export function loreloomApiPath(path: string) {
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  const configuredBase = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "");
+
+  if (!configuredBase || isUnsafeBrowserApiBase(configuredBase)) {
+    return normalizedPath;
+  }
+
+  return `${configuredBase}${normalizedPath}`;
+}
+
+function isUnsafeBrowserApiBase(baseUrl: string) {
+  if (typeof window === "undefined") return false;
+  if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") return false;
+
+  try {
+    const url = new URL(baseUrl);
+    return url.hostname === "localhost" || url.hostname === "127.0.0.1";
+  } catch {
+    return false;
+  }
+}

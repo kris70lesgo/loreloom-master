@@ -6,7 +6,7 @@ import { useStory } from "../../context/StoryContext";
 import { useWorldStore } from "../../store/useWorldStore";
 import { useWorkspaceStore } from "../../store/useWorkspaceStore";
 import type { AspectRatio } from "../../store/useWorkspaceStore";
-import { loreloomFetch } from "@/lib/api/loreloomFetch";
+import { loreloomApiPath, loreloomFetch } from "@/lib/api/loreloomFetch";
 import {
   DndContext,
   DragOverlay,
@@ -266,7 +266,7 @@ function WorkspaceContent() {
     if (!generating) return;
     const check = async () => {
       try {
-        const res = await loreloomFetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000"}/api/worlds/${activeWorld.id}`);
+        const res = await loreloomFetch(loreloomApiPath(`/api/worlds/${activeWorld.id}`));
         if (!res.ok) {
           const data = await res.json().catch(() => ({}));
           if (data.code === "QUOTA_EXCEEDED") setQuotaError(data.error || "AI provider quota exceeded");
@@ -444,13 +444,12 @@ function WorkspaceContent() {
   const handleNarrativeRefine = useCallback(async (instruction: string) => {
     if (!selectedChapter?.storyText) return;
     setIsRefiningNarrative(true);
-    const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
     try {
-      const response = await fetch(`${API_URL}/api/ai/generate`, {
+      const response = await fetch(loreloomApiPath("/api/ai/generate"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          provider: "gemini",
+          provider: "groq",
           prompt: [
             `You are a collaborative narrative editor for a story engine.`,
             `Current chapter text:`,
@@ -472,7 +471,7 @@ function WorkspaceContent() {
           setNarrativeText(refinedText);
           
           if (selectedChapter?.id && activeWorld?.id) {
-            await loreloomFetch(`${API_URL}/api/worlds/${activeWorld.id}/chapters/${selectedChapter.id}`, {
+            await loreloomFetch(loreloomApiPath(`/api/worlds/${activeWorld.id}/chapters/${selectedChapter.id}`), {
               method: "PATCH",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ content: refinedText })

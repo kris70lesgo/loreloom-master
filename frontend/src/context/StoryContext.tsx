@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { useWorldStore } from "../store/useWorldStore";
 import { createClient } from "@/lib/supabase/client";
-import { getLoreloomOwner, loreloomFetch } from "@/lib/api/loreloomFetch";
+import { getLoreloomOwner, loreloomApiPath, loreloomFetch } from "@/lib/api/loreloomFetch";
 
 export interface Chapter {
   id: string;
@@ -60,8 +60,6 @@ interface StoryContextType {
 }
 
 const StoryContext = createContext<StoryContextType | undefined>(undefined);
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
 // Backend API response shapes for type-safe mapping
 interface BackendWorldRow {
@@ -147,7 +145,7 @@ export const StoryProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   // Fetch single world details helper
   const fetchWorld = useCallback(async (id: string): Promise<boolean> => {
     try {
-      const response = await loreloomFetch(`${API_URL}/api/worlds/${id}`);
+      const response = await loreloomFetch(loreloomApiPath(`/api/worlds/${id}`));
       if (!response.ok) throw new Error("Failed to fetch world details");
       const data = await response.json();
       
@@ -180,7 +178,7 @@ export const StoryProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     const loadUserWorlds = async () => {
       try {
-        const response = await loreloomFetch(`${API_URL}/api/worlds?creatorId=${encodeURIComponent(userId)}`);
+        const response = await loreloomFetch(loreloomApiPath(`/api/worlds?creatorId=${encodeURIComponent(userId)}`));
         if (response.ok) {
           const data = await response.json();
           if (Array.isArray(data.worlds)) {
@@ -307,7 +305,7 @@ export const StoryProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       throw new Error("Could not identify the current user.");
     }
 
-    const response = await loreloomFetch(`${API_URL}/api/worlds`, {
+    const response = await loreloomFetch(loreloomApiPath("/api/worlds"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -346,7 +344,7 @@ export const StoryProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     try {
       const response = await loreloomFetch(
-        `${API_URL}/api/worlds/${activeWorldId}/chapters/${chapterId}/regenerate-image`,
+        loreloomApiPath(`/api/worlds/${activeWorldId}/chapters/${chapterId}/regenerate-image`),
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -379,7 +377,7 @@ export const StoryProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     if (!activeWorldId) return;
 
     try {
-      const response = await loreloomFetch(`${API_URL}/api/worlds/${activeWorldId}/chapters/${chapterId}`, {
+      const response = await loreloomFetch(loreloomApiPath(`/api/worlds/${activeWorldId}/chapters/${chapterId}`), {
         method: "DELETE"
       });
       if (!response.ok) {
@@ -404,7 +402,7 @@ export const StoryProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     if (!activeWorldId) return;
 
     try {
-      const response = await loreloomFetch(`${API_URL}/api/worlds/${activeWorldId}/chapters`, {
+      const response = await loreloomFetch(loreloomApiPath(`/api/worlds/${activeWorldId}/chapters`), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ prompt, styleLock, aspectRatio })
@@ -454,7 +452,7 @@ export const StoryProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     let shouldRemoveLocally = false;
 
     try {
-      const response = await loreloomFetch(`${API_URL}/api/worlds/${worldId}`, {
+      const response = await loreloomFetch(loreloomApiPath(`/api/worlds/${worldId}`), {
         method: "DELETE"
       });
       if (!response.ok) {
