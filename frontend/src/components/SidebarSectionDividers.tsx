@@ -699,7 +699,7 @@ export function SidebarSectionDividersDemo() {
                 onClick={async () => {
                   const supabase = createClient();
                   await supabase.auth.signOut();
-                  window.location.href = "/login";
+                  window.location.href = "/login?mode=signup";
                 }}
                 style={{
                   display: "flex",

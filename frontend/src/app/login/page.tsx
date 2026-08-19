@@ -19,15 +19,20 @@ export default function LoginPage() {
     if (error) {
       setErrorMsg(error);
     }
+    if (params.get("mode") === "signup") {
+      setIsLogin(false);
+    }
   }, []);
 
   const handleGoogleLogin = async () => {
     setLoadingGoogle(true);
     const supabase = createClient();
+    const params = new URLSearchParams(window.location.search);
+    const redirectTo = params.get("redirectTo") || params.get("redirect") || "/dashboard";
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
+        redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(redirectTo)}`,
       },
     });
 
@@ -41,6 +46,9 @@ export default function LoginPage() {
     setLoading(true);
     setErrorMsg(null);
   };
+
+  const params = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
+  const redirectTo = params?.get("redirectTo") || params?.get("redirect") || "/dashboard";
 
   return (
     <div style={styles.pageContainer}>
@@ -203,6 +211,7 @@ export default function LoginPage() {
         )}
 
         <form action={isLogin ? login : signup} onSubmit={onSubmit} style={styles.form}>
+          <input type="hidden" name="redirectTo" value={redirectTo} />
           <div style={styles.inputGroup}>
             <label htmlFor="email" style={styles.label}>Email</label>
             <input 

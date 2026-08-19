@@ -3,6 +3,17 @@ import { NextResponse, type NextRequest } from "next/server";
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
+  const pathname = request.nextUrl.pathname;
+
+  if (pathname !== "/auth/callback" && request.nextUrl.searchParams.has("code")) {
+    const url = request.nextUrl.clone();
+    const next = pathname === "/" || pathname === "/login" || pathname === "/signup"
+      ? "/dashboard"
+      : pathname;
+    url.pathname = "/auth/callback";
+    url.searchParams.set("next", next);
+    return NextResponse.redirect(url);
+  }
 
   // Gracefully skip session refresh when Supabase env vars are not configured
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -37,7 +48,7 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const pathname = request.nextUrl.pathname;
+  const isLandingRoute = pathname === "/";
   const isProtectedRoute =
     pathname.startsWith("/dashboard") ||
     pathname.startsWith("/genesis") ||
@@ -47,6 +58,12 @@ export async function updateSession(request: NextRequest) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     url.searchParams.set("redirectTo", pathname);
+    return NextResponse.redirect(url);
+  }
+
+  if (isLandingRoute && user) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/dashboard";
     return NextResponse.redirect(url);
   }
 
