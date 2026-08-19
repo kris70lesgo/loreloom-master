@@ -37,6 +37,10 @@ Start frontend, backend, and background worker concurrently:
 npm run dev
 ```
 
+## Production Worker
+
+When the app is deployed to Vercel, the background worker still needs a separate always-on process. Deploy the worker to Railway or Render using the checked-in `railway.json` or `render.yaml` config. See [WORKER_DEPLOYMENT.md](./WORKER_DEPLOYMENT.md).
+
 ## 📄 License
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 

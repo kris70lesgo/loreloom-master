@@ -1,0 +1,41 @@
+services:
+  - type: worker
+    name: loreloom-worker
+    runtime: node
+    plan: starter
+    buildCommand: npm install && npm run build:backend
+    startCommand: npm run start:worker -w @loreloom/api
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: WORKER_ID
+        value: loreloom-render-worker
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: TAVILY_API_KEY
+        sync: false
+      - key: POLLINATIONS_API_KEY
+        sync: false
+      - key: PINATA_JWT
+        sync: false
+      - key: MINT_MODE
+        sync: false
+      - key: THIRDWEB_CLIENT_ID
+        sync: false
+      - key: THIRDWEB_SECRET_KEY
+        sync: false
+      - key: THIRDWEB_VAULT_ACCESS_TOKEN
+        sync: false
+      - key: THIRDWEB_TRANSACTIONS_URL
+        sync: false
+      - key: X_LAYER_CHAIN_ID
+        sync: false
+      - key: GENESIS_CONTRACT_ADDRESS
+        sync: false
+      - key: CHAPTER_CONTRACT_ADDRESS
+        sync: false
