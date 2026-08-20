@@ -86,8 +86,8 @@ const chapterTool: ToolDefinition = {
     properties: {
       content: { type: "string" },
       sceneDescription: { type: "string" },
-      worldFacts: { type: "array", items: { type: "string" }, maxItems: 12 },
-      openThreads: { type: "array", items: { type: "string" }, maxItems: 12 }
+      worldFacts: { type: "array", items: { type: "string" }, maxItems: 6 },
+      openThreads: { type: "array", items: { type: "string" }, maxItems: 6 }
     }
   }
 };
@@ -120,7 +120,7 @@ export async function generateGenesisDraft(input: {
   ].join("\n");
 
   return generateValidated({
-    provider: input.provider ?? "openrouter",
+    provider: input.provider ?? "groq",
     tool: genesisTool,
     schema: genesisOutputSchema,
     systemPrompt:
@@ -146,7 +146,7 @@ export async function generateChapterDraft(
   ].join("\n");
 
   return generateValidated({
-    provider: provider ?? "openrouter",
+    provider: provider ?? "groq",
     tool: chapterTool,
     schema: chapterOutputSchema,
     systemPrompt:

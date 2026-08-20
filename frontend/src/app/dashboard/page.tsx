@@ -21,6 +21,8 @@ export default function DashboardPage() {
   const [activeTab, setActiveTab] = useState("Featured");
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [projectToDelete, setProjectToDelete] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null);
   const [showLimitAlert, setShowLimitAlert] = useState(false);
 
   return (
@@ -229,6 +231,7 @@ export default function DashboardPage() {
                             <button
                               onClick={(e) => {
                                   e.stopPropagation();
+                                  setDeleteError(null);
                                   setProjectToDelete(world.id);
                                   setOpenMenuId(null);
                               }}
@@ -300,9 +303,17 @@ export default function DashboardPage() {
               <p style={{ color: "var(--text-secondary)", fontSize: "0.9rem", marginBottom: "32px", lineHeight: 1.5 }}>
                 Are you sure you want to delete this project? This action cannot be undone and all canonical data will be lost.
               </p>
+              {deleteError && (
+                <p style={{ color: "#ef4444", fontSize: "0.82rem", margin: "-18px 0 24px", lineHeight: 1.4 }}>
+                  {deleteError}
+                </p>
+              )}
               <div style={{ display: "flex", gap: "12px", justifyContent: "center" }}>
                 <button 
-                  onClick={() => setProjectToDelete(null)}
+                  onClick={() => {
+                    setProjectToDelete(null);
+                    setDeleteError(null);
+                  }}
                   style={{
                     background: "hsl(var(--background))",
                     border: "1px solid hsl(var(--border))",
@@ -318,11 +329,17 @@ export default function DashboardPage() {
                 </button>
                 <button 
                   onClick={async () => {
+                    if (!projectToDelete || deletingProjectId) return;
+                    setDeleteError(null);
+                    setDeletingProjectId(projectToDelete);
                     try {
                       await deleteWorld(projectToDelete);
                       setProjectToDelete(null);
                     } catch (err) {
                       console.warn("Failed to delete project:", err);
+                      setDeleteError(err instanceof Error ? err.message : "Failed to delete project.");
+                    } finally {
+                      setDeletingProjectId(null);
                     }
                   }}
                   style={{
@@ -333,10 +350,11 @@ export default function DashboardPage() {
                     borderRadius: "8px",
                     cursor: "pointer",
                     fontFamily: "var(--font-inter)",
-                    fontWeight: 600
+                    fontWeight: 600,
+                    opacity: deletingProjectId ? 0.65 : 1
                   }}
                 >
-                  Delete Permanently
+                  {deletingProjectId ? "Deleting..." : "Delete Permanently"}
                 </button>
               </div>
             </motion.div>

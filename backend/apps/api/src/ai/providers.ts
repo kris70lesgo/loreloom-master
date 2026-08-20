@@ -1,6 +1,6 @@
 import { config, type AiProvider } from "../config.js";
 import { AiBlockedError, ProviderRequestError, ProviderSetupError } from "./errors.js";
-import { callOpenAiCompatibleChat, callOpenAiCompatibleTool } from "./openaiCompatible.js";
+import { callOpenAiCompatibleChat, callOpenAiCompatibleJson, callOpenAiCompatibleTool } from "./openaiCompatible.js";
 import type {
   GenerateInput,
   GenerateOutput,
@@ -152,7 +152,7 @@ async function generateGroqTool(input: StructuredGenerateInput): Promise<Structu
     throw new ProviderSetupError("Groq", "GROQ_API_KEY");
   }
 
-  const result = await callOpenAiCompatibleTool({
+  const result = await callOpenAiCompatibleJson({
     providerName: "Groq",
     endpoint: "https://api.groq.com/openai/v1/chat/completions",
     apiKey: config.groq.apiKey,

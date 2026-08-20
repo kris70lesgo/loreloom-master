@@ -87,8 +87,8 @@ const chapterTool: ToolDefinition = {
     properties: {
       content: { type: "string" },
       sceneDescription: { type: "string" },
-      worldFacts: { type: "array", items: { type: "string" }, maxItems: 12 },
-      openThreads: { type: "array", items: { type: "string" }, maxItems: 12 }
+      worldFacts: { type: "array", items: { type: "string" }, maxItems: 6 },
+      openThreads: { type: "array", items: { type: "string" }, maxItems: 6 }
     }
   }
 };
@@ -98,6 +98,7 @@ export async function generateGenesisDraft(input: {
   styleLock?: string | null;
   provider?: AiProvider;
 }): Promise<{ draft: GenesisDraft; generation: StructuredGenerateOutput; validationAttempt: number; research?: ResearchEvidence }> {
+  const totalStartedAt = Date.now();
   // Extract heritage subject from intake
   const userPrompt = typeof input.intake === "object" && input.intake !== null
     ? String((input.intake as any).prompt || (input.intake as any).name || (input.intake as any).premise || "")
@@ -106,6 +107,7 @@ export async function generateGenesisDraft(input: {
   // Perform heritage research via Tavily
   let researchEvidence: ResearchEvidence | null = null;
   try {
+    const researchStartedAt = Date.now();
     const researchInput: HeritageResearchInput = {
       subject: userPrompt,
       category: typeof input.intake === "object" && input.intake !== null
@@ -113,6 +115,7 @@ export async function generateGenesisDraft(input: {
         : undefined
     };
     researchEvidence = await researchHeritageSubject(researchInput);
+    console.log(`[story] Genesis research completed in ${Date.now() - researchStartedAt}ms`);
   } catch (err) {
     console.warn("[story] Heritage research failed, continuing without:", err);
   }
@@ -141,6 +144,7 @@ export async function generateGenesisDraft(input: {
     "worldFacts and openThreads are compact canon, not prose summaries."
   ].join("\n");
 
+  const aiStartedAt = Date.now();
   const result = await generateValidated({
     provider: input.provider ?? "groq",
     tool: genesisTool,
@@ -150,6 +154,8 @@ export async function generateGenesisDraft(input: {
     prompt,
     temperature: 0.65
   });
+  console.log(`[story] Genesis AI generation completed in ${Date.now() - aiStartedAt}ms`);
+  console.log(`[story] Genesis draft total completed in ${Date.now() - totalStartedAt}ms`);
 
   return { ...result, research: researchEvidence ?? undefined };
 }

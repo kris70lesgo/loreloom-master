@@ -1,6 +1,6 @@
 import { config, type AiProvider } from "@/server/config";
 import { AiBlockedError, ProviderRequestError, ProviderSetupError } from "@/server/ai/errors";
-import { callOpenAiCompatibleChat, callOpenAiCompatibleTool } from "@/server/ai/openaiCompatible";
+import { callOpenAiCompatibleChat, callOpenAiCompatibleJson, callOpenAiCompatibleTool } from "@/server/ai/openaiCompatible";
 import type {
   GenerateInput,
   GenerateOutput,
@@ -24,6 +24,11 @@ export function getProviderStatuses(): ProviderStatus[] {
       provider: "nvidia",
       configured: Boolean(config.nvidia.apiKey),
       model: config.nvidia.model
+    },
+    {
+      provider: "groq",
+      configured: Boolean(config.groq.apiKey),
+      model: config.groq.model
     }
   ];
 }
@@ -41,6 +46,12 @@ export async function generateText(input: GenerateInput): Promise<GenerateOutput
         provider: "nvidia",
         model: config.nvidia.model,
         text: await generateWithNvidia(input)
+      };
+    case "groq":
+      return {
+        provider: "groq",
+        model: config.groq.model,
+        text: await generateWithGroq(input)
       };
     default:
       return assertNever(input.provider);
@@ -81,6 +92,8 @@ async function generateStructuredWithProvider(
       return generateOpenRouterTool(input);
     case "nvidia":
       return generateNvidiaTool(input);
+    case "groq":
+      return generateGroqTool(input);
     default:
       return assertNever(provider);
   }
@@ -134,6 +147,29 @@ async function generateNvidiaTool(input: StructuredGenerateInput): Promise<Struc
   return { provider: "nvidia", model: config.nvidia.model, ...result };
 }
 
+async function generateGroqTool(input: StructuredGenerateInput): Promise<StructuredGenerateOutput> {
+  if (!config.groq.apiKey) {
+    throw new ProviderSetupError("Groq", "GROQ_API_KEY");
+  }
+
+  const result = await callOpenAiCompatibleJson({
+    providerName: "Groq",
+    endpoint: "https://api.groq.com/openai/v1/chat/completions",
+    apiKey: config.groq.apiKey,
+    model: config.groq.model,
+    prompt: input.prompt,
+    systemPrompt: input.systemPrompt,
+    tool: input.tool,
+    temperature: input.temperature
+  });
+
+  if (result.safety.status !== "passed") {
+    throw new AiBlockedError("Groq blocked or refused this generation.", result.safety);
+  }
+
+  return { provider: "groq", model: config.groq.model, ...result };
+}
+
 async function generateWithNvidia(input: GenerateInput) {
   if (!config.nvidia.apiKey) {
     throw new ProviderSetupError("NVIDIA", "NVIDIA_API_KEY");
@@ -150,6 +186,22 @@ async function generateWithNvidia(input: GenerateInput) {
   });
 }
 
+async function generateWithGroq(input: GenerateInput) {
+  if (!config.groq.apiKey) {
+    throw new ProviderSetupError("Groq", "GROQ_API_KEY");
+  }
+
+  return callOpenAiCompatibleChat({
+    providerName: "Groq",
+    endpoint: "https://api.groq.com/openai/v1/chat/completions",
+    apiKey: config.groq.apiKey,
+    model: config.groq.model,
+    prompt: input.prompt,
+    systemPrompt: input.systemPrompt,
+    temperature: input.temperature
+  });
+}
+
 function assertNever(value: never): never {
   throw new Error(`Unhandled AI provider: ${value}`);
 }
@@ -159,5 +211,5 @@ function isTransientProviderError(error: ProviderRequestError) {
 }
 
 export function isAiProvider(value: string): value is AiProvider {
-  return value === "openrouter" || value === "nvidia";
+  return value === "openrouter" || value === "nvidia" || value === "groq";
 }

@@ -12,7 +12,7 @@ const createWorldSchema = z.object({
   title: z.string().trim().min(1).optional(),
   intake: intakeSchema.optional(),
   styleLock: z.string().trim().min(1).optional(),
-  aiProvider: z.enum(["openrouter", "nvidia"]).optional()
+  aiProvider: z.enum(["openrouter", "nvidia", "groq"]).optional()
 });
 
 export async function GET(request: NextRequest) {

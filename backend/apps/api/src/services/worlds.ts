@@ -39,7 +39,7 @@ export async function createWorld(input: {
   const job = await enqueueJob({
     jobType: "genesis.generate",
     worldId: world.id,
-    payload: { reason: "initial", provider: input.aiProvider ?? "openrouter" }
+    payload: { reason: "initial", provider: input.aiProvider ?? "groq" }
   });
 
   return { user, world: world as WorldRow, job };
@@ -95,7 +95,7 @@ export async function retryGenesisGeneration(worldId: string, ownerIdentifier?: 
   const job = await enqueueJobIfMissing({
     jobType: "genesis.generate",
     worldId: world.id,
-    payload: { reason: "retry", provider: "openrouter" }
+    payload: { reason: "retry", provider: "groq" }
   });
   const { error } = await supabase.from("worlds").update({ status: "draft" }).eq("id", world.id);
   if (error) {
@@ -415,10 +415,6 @@ export async function deleteWorld(worldId: string, ownerIdentifier: string) {
   const supabase = getSupabaseAdmin();
   const world = await getWorldRow(worldId);
   await assertWorldOwner(world, ownerIdentifier);
-
-  if (world.genesis_token_id) {
-    throw new HttpError(409, "A minted world cannot be deleted.");
-  }
 
   await supabase.from("generation_jobs").delete().eq("world_id", world.id);
   await supabase.from("procurements").delete().eq("world_id", world.id);

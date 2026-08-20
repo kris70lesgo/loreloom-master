@@ -94,7 +94,9 @@ async function generateImage(input: { prompt: string; referenceImageUrl?: string
   // 1. Use Pollinations AI as the primary provider (free, fast, reliable with token).
   try {
     console.log("[images] Generating image via Pollinations AI...");
+    const startedAt = Date.now();
     const url = await generatePollinationsImage(input);
+    console.log(`[images] Pollinations stage completed in ${Date.now() - startedAt}ms`);
     console.log("[images] Pollinations image generation succeeded:", summarizeImageUrl(url));
     return url;
   } catch (err) {

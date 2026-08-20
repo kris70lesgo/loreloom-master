@@ -94,7 +94,9 @@ async function generateImage(input: { prompt: string; referenceImageUrl?: string
   if (config.stability.apiKey) {
     try {
       console.log("[images] Attempting image generation via Stability API...");
+      const startedAt = Date.now();
       const url = await generateStabilityImage(input);
+      console.log(`[images] Stability stage completed in ${Date.now() - startedAt}ms`);
       console.log("[images] Stability image generation succeeded:", url);
       return url;
     } catch (err) {
@@ -105,7 +107,9 @@ async function generateImage(input: { prompt: string; referenceImageUrl?: string
   // 3. Try Pollinations AI FLUX Engine (Free, instant, unlimited AI image generation matching exact prompt!)
   try {
     console.log("[images] Generating relevant AI artwork via Pollinations FLUX engine...");
+    const startedAt = Date.now();
     const url = await generatePollinationsImage(input);
+    console.log(`[images] Pollinations stage completed in ${Date.now() - startedAt}ms`);
     console.log("[images] Pollinations FLUX image generation succeeded:", url);
     return url;
   } catch (err) {

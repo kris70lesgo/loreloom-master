@@ -23,10 +23,18 @@ type ChatCompletionResponse = {
   }>;
   error?: {
     message?: string;
+    code?: string;
+    type?: string;
+    failed_generation?: string;
   };
 };
 
 export type OpenAiCompatibleToolResult = {
+  arguments: unknown;
+  safety: SafetyResult;
+};
+
+export type OpenAiCompatibleJsonResult = {
   arguments: unknown;
   safety: SafetyResult;
 };
@@ -49,7 +57,7 @@ export async function callOpenAiCompatibleChat(args: {
 
   messages.push({ role: "user", content: args.prompt });
 
-  const response = await fetch(args.endpoint, {
+  const response = await fetchWithTimeout(args.endpoint, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -59,7 +67,8 @@ export async function callOpenAiCompatibleChat(args: {
     body: JSON.stringify({
       model: args.model,
       messages,
-      temperature: args.temperature ?? 0.7
+      temperature: args.temperature ?? 0.7,
+      max_tokens: 1800
     })
   });
 
@@ -93,7 +102,7 @@ export async function callOpenAiCompatibleTool(args: {
   temperature?: number;
   headers?: Record<string, string>;
 }): Promise<OpenAiCompatibleToolResult> {
-  const response = await fetch(args.endpoint, {
+  const response = await fetchWithTimeout(args.endpoint, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -118,13 +127,24 @@ export async function callOpenAiCompatibleTool(args: {
         }
       ],
       tool_choice: { type: "function", function: { name: args.tool.name } },
-      parallel_tool_calls: false
+      parallel_tool_calls: false,
+      max_tokens: 1800
     })
   });
 
   const data = (await response.json().catch(() => ({}))) as ChatCompletionResponse;
 
   if (!response.ok) {
+    if (data.error?.code === "tool_use_failed" && data.error?.failed_generation) {
+      const partialArgs = extractToolCallArguments(data.error.failed_generation);
+      if (partialArgs) {
+        return {
+          arguments: partialArgs,
+          safety: { status: "passed", finishReason: "tool_calls" }
+        };
+      }
+    }
+
     throw new ProviderRequestError(args.providerName, data.error?.message ?? response.statusText, response.status);
   }
 
@@ -165,5 +185,142 @@ export async function callOpenAiCompatibleTool(args: {
         finishReason
       }
     };
+  }
+}
+
+export async function callOpenAiCompatibleJson(args: {
+  providerName: string;
+  endpoint: string;
+  apiKey: string;
+  model: string;
+  prompt: string;
+  systemPrompt: string;
+  tool: ToolDefinition;
+  temperature?: number;
+  headers?: Record<string, string>;
+}): Promise<OpenAiCompatibleJsonResult> {
+  const response = await fetchWithTimeout(args.endpoint, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${args.apiKey}`,
+      ...args.headers
+    },
+    body: JSON.stringify({
+      model: args.model,
+      messages: [
+        {
+          role: "system",
+          content: [
+            args.systemPrompt,
+            "",
+            "Return only one JSON object. Do not include markdown, prose, or tool-call wrappers.",
+            `The JSON object must match this schema for ${args.tool.name}:`,
+            JSON.stringify(args.tool.parameters)
+          ].join("\n")
+        },
+        { role: "user", content: args.prompt }
+      ],
+      temperature: args.temperature ?? 0.7,
+      response_format: { type: "json_object" },
+      max_tokens: 1800
+    })
+  });
+
+  const data = (await response.json().catch(() => ({}))) as ChatCompletionResponse;
+
+  if (!response.ok) {
+    if (data.error?.failed_generation) {
+      const partialArgs = extractJsonObject(data.error.failed_generation);
+      if (partialArgs) {
+        return {
+          arguments: partialArgs,
+          safety: { status: "passed", finishReason: data.error.code ?? data.error.type }
+        };
+      }
+    }
+
+    throw new ProviderRequestError(args.providerName, data.error?.message ?? response.statusText, response.status);
+  }
+
+  const content = data.choices?.[0]?.message?.content?.trim();
+  if (!content) {
+    return {
+      arguments: null,
+      safety: {
+        status: "blocked",
+        reason: "The model did not return the required JSON result.",
+        finishReason: data.choices?.[0]?.finish_reason
+      }
+    };
+  }
+
+  try {
+    const parsed = extractJsonObject(content);
+    if (!parsed) {
+      throw new Error("invalid json");
+    }
+
+    return {
+      arguments: parsed,
+      safety: { status: "passed", finishReason: data.choices?.[0]?.finish_reason }
+    };
+  } catch {
+    return {
+      arguments: null,
+      safety: {
+        status: "blocked",
+        reason: "The model returned invalid JSON.",
+        finishReason: data.choices?.[0]?.finish_reason
+      }
+    };
+  }
+}
+
+function extractToolCallArguments(failedGeneration: string): unknown {
+  const match = failedGeneration.match(/<function=[^>]+>([\s\S]*)<\/function>/);
+  const jsonStr = match ? match[1].trim() : failedGeneration.trim();
+
+  try {
+    return JSON.parse(jsonStr);
+  } catch {
+    return null;
+  }
+}
+
+async function fetchWithTimeout(input: string | URL, init: RequestInit, timeoutMs = 30000) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new ProviderRequestError("AI provider", `request timed out after ${timeoutMs}ms`, 408);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+function extractJsonObject(text: string): unknown {
+  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+  const candidate = fenced?.[1] ?? text;
+  const trimmed = candidate.trim();
+
+  try {
+    return JSON.parse(trimmed);
+  } catch {
+    const start = trimmed.indexOf("{");
+    const end = trimmed.lastIndexOf("}");
+    if (start === -1 || end <= start) {
+      return null;
+    }
+
+    try {
+      return JSON.parse(trimmed.slice(start, end + 1));
+    } catch {
+      return null;
+    }
   }
 }

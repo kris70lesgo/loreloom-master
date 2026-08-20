@@ -22,7 +22,7 @@
 | Backend | Express.js + TypeScript (Node.js) |
 | Worker | Separate Node.js process polling Supabase for background jobs |
 | Database | Supabase (PostgreSQL) — project ID: `khbwebwosasbwsdlayil` |
-| AI Text | Groq API (`llama-3.3-70b-versatile`) — NOT Gemini |
+| AI Text | Groq API (`openai/gpt-oss-120b`) — NOT Gemini |
 | AI Images | Pollinations AI (primary), Stability AI (fallback, no credits), Gemini (last resort) |
 | Web Research | Tavily API — Heritage Research Agent |
 | IPFS | Pinata (JWT-based pinning) |
@@ -70,7 +70,7 @@ All keys are in the root `.env` file. **Never commit secrets.**
 | `SUPABASE_ANON_KEY` | Supabase anon key |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role (admin access) |
 | `GROQ_API_KEY` | Text generation (primary AI provider) |
-| `GROQ_MODEL` | `llama-3.3-70b-versatile` |
+| `GROQ_MODEL` | `openai/gpt-oss-120b` |
 | `TAVILY_API_KEY` | Heritage Research Agent web search |
 | `STABILITY_API_KEY` | Image generation fallback (no credits — don't rely on) |
 | `POLLINATIONS_API_KEY` | Image generation (primary) |

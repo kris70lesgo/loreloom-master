@@ -4,8 +4,7 @@ import type { JsonValue } from "@/server/db/types";
 
 export async function pinJson(metadata: JsonValue) {
   if (config.ipfs.mode === "mock") {
-    const hash = createHash("sha256").update(JSON.stringify(metadata)).digest("hex").slice(0, 46);
-    return `ipfs://mock/metadata/${hash}`;
+    return mockJsonUri(metadata);
   }
 
   if (config.ipfs.mode !== "pinata" || !config.ipfs.pinataJwt) {
@@ -22,7 +21,11 @@ export async function pinJson(metadata: JsonValue) {
   });
   const data = (await response.json().catch(() => ({}))) as { IpfsHash?: string; error?: string };
   if (!response.ok || !data.IpfsHash) {
-    throw new Error(data.error ?? "Pinata could not store NFT metadata.");
+    console.warn("[ipfs] Pinata metadata upload failed; using mock metadata URI.", {
+      status: response.status,
+      error: data.error ?? "Pinata could not store NFT metadata."
+    });
+    return mockJsonUri(metadata);
   }
 
   return `ipfs://${data.IpfsHash}`;
@@ -59,4 +62,9 @@ export async function pinImage(input: { bytes: Uint8Array; mimeType: string; nam
   }
 
   return `ipfs://${data.IpfsHash}`;
+}
+
+function mockJsonUri(metadata: JsonValue) {
+  const hash = createHash("sha256").update(JSON.stringify(metadata)).digest("hex").slice(0, 46);
+  return `ipfs://mock/metadata/${hash}`;
 }

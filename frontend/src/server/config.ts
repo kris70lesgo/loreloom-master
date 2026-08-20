@@ -20,7 +20,7 @@ for (const envPath of envRoots.map((envPath) => envPath.replace(/\.env$/, ".env.
   }
 }
 
-export type AiProvider = "openrouter" | "nvidia";
+export type AiProvider = "openrouter" | "nvidia" | "groq";
 
 export const config = {
   port: Number(process.env.PORT ?? 4000),
@@ -48,6 +48,10 @@ export const config = {
   nvidia: {
     apiKey: process.env.NVIDIA_API_KEY,
     model: process.env.NVIDIA_MODEL ?? "meta/llama-3.1-70b-instruct"
+  },
+  groq: {
+    apiKey: process.env.GROQ_API_KEY,
+    model: process.env.GROQ_MODEL ?? "openai/gpt-oss-120b"
   },
   stability: {
     apiKey: process.env.STABILITY_API_KEY

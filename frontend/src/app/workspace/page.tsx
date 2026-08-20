@@ -633,7 +633,14 @@ function WorkspaceContent() {
 
             {selectedChapter ? (
               <div style={{ display: "flex", flexDirection: "column", gap: "14px", paddingLeft: (selectedChapter.storyText || narrativeText) ? "14px" : "0" }}>
-                {selectedChapter.storyText || narrativeText ? (
+                {selectedChapter.status === "failed" && !selectedChapter.storyText && !narrativeText ? (
+                  <div style={s.documentBlock}>
+                    <div style={s.documentBlockLabel}>NARRATIVE BEAT</div>
+                    <p style={{ color: "#ff6b6b", fontSize: "0.95rem", lineHeight: 1.6, margin: 0 }}>
+                      Generation failed. Try weaving this chapter again.
+                    </p>
+                  </div>
+                ) : selectedChapter.storyText || narrativeText ? (
                   <div style={s.documentBlock}>
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "6px" }}>
                       <div style={s.documentBlockLabel}>NARRATIVE BEAT</div>
@@ -1217,7 +1224,7 @@ const s: Record<string, React.CSSProperties> = {
     display: "flex",
     flexDirection: "column",
     gap: "16px",
-    minHeight: "100vh",
+    height: "100dvh",
     background: "hsl(var(--background))",
     color: "hsl(var(--foreground))",
     position: "relative",
@@ -1324,7 +1331,8 @@ const s: Record<string, React.CSSProperties> = {
     padding: "18px 20px 12px",
     display: "flex",
     flexDirection: "column",
-    minHeight: "360px",
+    minHeight: 0,
+    height: "100%",
     overflow: "hidden",
   },
 
@@ -1488,6 +1496,8 @@ const s: Record<string, React.CSSProperties> = {
     padding: "18px",
     display: "flex",
     flexDirection: "column",
+    minHeight: 0,
+    height: "100%",
     overflow: "hidden",
     position: "relative",
   },
@@ -1513,14 +1523,17 @@ const s: Record<string, React.CSSProperties> = {
   },
 
   canvasViewport: {
-    flex: 1,
+    flex: "0 1 auto",
+    width: "100%",
+    aspectRatio: "16 / 9",
+    maxHeight: "100%",
+    minHeight: 0,
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
     borderRadius: "10px",
     overflow: "hidden",
     position: "relative",
-    minHeight: "200px",
   },
   canvasGlow: {
     position: "absolute",

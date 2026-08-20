@@ -67,9 +67,8 @@ export async function researchHeritageSubject(input: HeritageResearchInput): Pro
     }
   }
 
-  const allResults: TavilyResult[] = [];
-  const seenUrls = new Set<string>();
-  for (const query of generateSearchQueries(cleanSubject, input.category)) {
+  const searchStartedAt = Date.now();
+  const searchResults = await Promise.all(generateSearchQueries(cleanSubject, input.category).map(async (query) => {
     const options: ResearchSearchOptions = {
       maxResults: 5,
       searchDepth: "basic",
@@ -79,14 +78,22 @@ export async function researchHeritageSubject(input: HeritageResearchInput): Pro
       const startTime = Date.now();
       const results = await tavily.search(query, options);
       console.log(`[heritage-research] Query: "${query}" → ${results.length} results in ${Date.now() - startTime}ms`);
-      for (const result of results) {
-        if (result.url && !seenUrls.has(result.url)) {
-          seenUrls.add(result.url);
-          allResults.push(result);
-        }
-      }
+      return results;
     } catch (err) {
       console.warn(`[heritage-research] Search failed for "${query}":`, err);
+      return [];
+    }
+  }));
+  console.log(`[heritage-research] Search batch for "${cleanSubject}" completed in ${Date.now() - searchStartedAt}ms`);
+
+  const allResults: TavilyResult[] = [];
+  const seenUrls = new Set<string>();
+  for (const results of searchResults) {
+    for (const result of results) {
+      if (result.url && !seenUrls.has(result.url)) {
+        seenUrls.add(result.url);
+        allResults.push(result);
+      }
     }
   }
 

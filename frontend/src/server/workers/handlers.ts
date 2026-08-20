@@ -64,11 +64,14 @@ async function processGenesisGenerateJob(job: GenerationJobRow) {
     throw new Error(error.message);
   }
 
-  const portraitJob = await enqueueJobIfMissing({
+  const portraitJob = await enqueueFollowUpJobOrSkipDeleted(job, {
     jobType: "portrait.generate",
     worldId: world.id,
     payload: { provider: generation.provider }
   });
+  if (!portraitJob) {
+    return;
+  }
 
   await markJobSucceeded(job.id, {
     ai: generationCheckpoint(generation, validationAttempt),
@@ -187,11 +190,14 @@ async function processChapterGenerateJob(job: GenerationJobRow) {
     await updateJobCheckpoint(job.id, { ai: generationCheckpoint(generation, validationAttempt) });
   }
 
-  const imageJob = await enqueueJobIfMissing({
+  const imageJob = await enqueueFollowUpJobOrSkipDeleted(job, {
     jobType: "chapter.image",
     worldId: world.id,
     chapterId: chapter.id
   });
+  if (!imageJob) {
+    return;
+  }
 
   await markJobSucceeded(job.id, { status: "text_ready", nextJobId: imageJob.id });
 }
@@ -235,11 +241,14 @@ async function processChapterImageJob(job: GenerationJobRow) {
     });
   }
 
-  const mintJob = await enqueueJobIfMissing({
+  const mintJob = await enqueueFollowUpJobOrSkipDeleted(job, {
     jobType: "chapter.mint",
     worldId: world.id,
     chapterId: chapter.id
   });
+  if (!mintJob) {
+    return;
+  }
 
   await markJobSucceeded(job.id, { nextJobId: mintJob.id });
 }
@@ -297,17 +306,12 @@ async function processChapterMintJob(job: GenerationJobRow) {
 function providerFromJob(job: GenerationJobRow) {
   if (typeof job.payload === "object" && job.payload !== null && !Array.isArray(job.payload)) {
     const provider = job.payload.provider;
-    if (provider === "openrouter" || provider === "nvidia") {
-      return provider as "openrouter" | "nvidia";
+    if (provider === "openrouter" || provider === "nvidia" || provider === "groq") {
+      return provider;
     }
   }
 
-  // If NVIDIA is configured, prefer it over OpenRouter since OpenRouter free tier is heavily rate-limited (429)
-  if (config.nvidia.apiKey) {
-    return "nvidia" as const;
-  }
-
-  return "openrouter" as const;
+  return "groq" as const;
 }
 
 function generationCheckpoint(
@@ -321,4 +325,31 @@ function generationCheckpoint(
     validationAttempt,
     safety: generation.safety
   };
+}
+
+async function enqueueFollowUpJobOrSkipDeleted(
+  currentJob: GenerationJobRow,
+  input: Parameters<typeof enqueueJobIfMissing>[0]
+) {
+  try {
+    return await enqueueJobIfMissing(input);
+  } catch (error) {
+    if (isDeletedParentForeignKeyError(error)) {
+      await markJobSucceeded(currentJob.id, {
+        skipped: true,
+        reason: "Parent world or chapter was deleted before the follow-up job could be queued."
+      });
+      return null;
+    }
+
+    throw error;
+  }
+}
+
+function isDeletedParentForeignKeyError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  return (
+    message.includes("generation_jobs_world_id_fkey") ||
+    message.includes("generation_jobs_chapter_id_fkey")
+  );
 }

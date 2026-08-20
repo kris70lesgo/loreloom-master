@@ -98,16 +98,19 @@ function mapBackendWorld(backendWorld: BackendWorldRow, backendChapters: Backend
     createdAt: backendWorld.created_at || new Date().toISOString(),
     status: backendWorld.status,
     referenceImageUrl: backendWorld.reference_image_url,
-    chapters: (backendChapters || []).map((ch, idx) => ({
-      id: ch.id,
-      number: idx + 1,
-      title: `Chapter ${idx + 1}`,
-      storyText: ch.content || "AI is weaving the chapter story...",
-      illustrationSeed: ch.image_url || (ch.status === "failed" ? "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=600&auto=format&fit=crop" : "awaiting-synthesis"),
-      isMinted: ch.status === "minted" || ch.chapter_token_id !== null,
-      prompt: ch.scene_description || "Generated beat",
-      status: ch.status
-    }))
+    chapters: (backendChapters || []).map((ch, idx) => {
+      const hasPendingImage = ch.status === "draft" || ch.status === "text_ready" || ch.status === "generating";
+      return {
+        id: ch.id,
+        number: idx + 1,
+        title: `Chapter ${idx + 1}`,
+        storyText: ch.content || "",
+        illustrationSeed: ch.image_url || (hasPendingImage ? "awaiting-synthesis" : backendWorld.reference_image_url || "awaiting-synthesis"),
+        isMinted: ch.status === "minted" || ch.chapter_token_id !== null,
+        prompt: ch.scene_description || "Generated beat",
+        status: ch.status
+      };
+    })
   };
 }
 
